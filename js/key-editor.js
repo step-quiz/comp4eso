@@ -68,10 +68,14 @@ export function buildKeyGrid() {
     prefix: 'k',
     onClick: qi => { keyDraftQIdx = qi; renderKey(); },
   };
-  const ranges = getAmbitRanges();
-  const colGroups = ranges.length === 4
-    ? [[ranges[0], ranges[1]], [ranges[2], ranges[3]]]
-    : [[ranges[0], ranges[1]], [ranges[2]]];
+  const id   = getCurrentCompetencyId();
+  const comp = COMPETENCIES[id];
+  // 'default' is the pre-wizard placeholder; nothing to render yet.
+  if (!comp || !comp.layout) return;
+
+  const ranges    = getAmbitRanges();
+  const colGroups = comp.layout.map(group => group.map(i => ranges[i]));
+
   grid.style.display = 'grid';
   grid.style.gridTemplateColumns = '1fr 1fr';
   grid.style.gap = '8px';

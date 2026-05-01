@@ -8,6 +8,7 @@ import {
   getAnswerKey, getLastResults, setLastResults,
 } from './state.js';
 import { getQ, getAmbitRanges } from './render.js';
+import { esc } from './utils.js';
 
 export function scoreStudent(answers, key) {
   const ranges = getAmbitRanges();
@@ -63,14 +64,12 @@ export function renderResults({ rows }) {
   const Q = getQ();
   const ranges = getAmbitRanges();
   const n = rows.length;
-  const avg = n ? rows.reduce((s, r) => s + r.total, 0) / n : 0;
-  // (avg/pct were computed but only used for an unused header earlier — preserve behaviour)
 
   document.getElementById('res-title').textContent =
     `Resultats · CompBàsiques 4t ESO · ${n} alumnes`;
 
   const ambitHeaders = ranges.map(a =>
-    `<th style="color:${a.color}" title="${a.name}">${a.abbrev}</th>`
+    `<th style="color:${a.color}" title="${esc(a.name)}">${esc(a.abbrev)}</th>`
   ).join('');
 
   const thead = `<thead><tr>
@@ -81,13 +80,13 @@ export function renderResults({ rows }) {
 
   const tbody = '<tbody>' + rows.map((r, i) => {
     const ambitTds = r.ambitScores.map((s, j) => {
-      const pctA = Math.round(s.correct / s.total * 100);
-      return `<td class="score" style="color:${ranges[j].color}" title="${ranges[j].name}: ${s.correct}/${s.total} (${pctA}%)">${s.correct}/${s.total}</td>`;
+      const pctA = s.total > 0 ? Math.round(s.correct / s.total * 100) : 0;
+      return `<td class="score" style="color:${ranges[j].color}" title="${esc(ranges[j].name)}: ${s.correct}/${s.total} (${pctA}%)">${s.correct}/${s.total}</td>`;
     }).join('');
     const totalPct = Math.round(r.total / Q * 100);
     return `<tr>
       <td>${i + 1}</td>
-      <td>${r.name}</td>
+      <td>${esc(r.name)}</td>
       ${ambitTds}
       <td class="total-score" title="${totalPct}%">${r.total}/${Q}</td>
       <td class="ok">${r.total}</td>
