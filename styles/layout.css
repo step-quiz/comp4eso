@@ -1,0 +1,105 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   layout.css — Structural layout: header bar, main grid wrapper, PDF
+   pane, navigation row, keyboard reference, ambit sections.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Header ── */
+.hdr { display: flex; align-items: center; gap: 8px; flex-shrink: 0; position: relative; }
+.hdr-left  { display: flex; align-items: center; gap: 8px; }
+.hdr-center {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; pointer-events: auto;
+}
+.hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.hdr-title { font-size: .86rem; font-weight: 700; color: var(--accent); letter-spacing: .08em; text-transform: uppercase; line-height: 1.2; }
+.spacer    { flex: 1; }
+.stu-code  { font-size: 1.5rem; font-weight: 700; color: var(--accent); line-height: 1; }
+.hdr-name  {
+  font-size: 1.68rem; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 40vw; text-align: center;
+  cursor: pointer; border-bottom: 1.5px dashed transparent;
+  transition: border-color .15s;
+}
+.hdr-name:hover { border-bottom-color: var(--accent); }
+
+/* ── Progress ── */
+.prog-wrap { height: 3px; background: var(--border); border-radius: 2px; flex-shrink: 0; }
+.prog-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .25s; }
+
+/* ── Grid ── */
+.main {
+  display: flex; flex: 1; min-height: 0; gap: 5px;
+}
+.grid-wrapper {
+  display: flex; flex-direction: column; gap: 3px;
+  flex: 1 1 50%; min-height: 0; min-width: 0;
+}
+body:not(.has-pdf) .grid-wrapper { flex: 1; }
+.ambit-bar {
+  font-size: .65rem; font-weight: 700; text-align: center;
+  text-transform: uppercase; letter-spacing: .1em; color: #fff;
+  padding: 4px 8px; border-radius: 5px; flex-shrink: 0;
+}
+.grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 5px; flex: 1; min-height: 0;
+}
+
+/* ── PDF pane ── */
+.pdf-pane {
+  display: none;
+  flex: 1 1 50%; min-width: 0; min-height: 0;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+  overflow-y: auto; overflow-x: hidden; position: relative;
+}
+body.has-pdf .pdf-pane { display: block; }
+.pdf-bar {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  font-size: .58rem; color: var(--muted);
+}
+.pdf-bar-page { color: var(--accent); font-weight: 700; letter-spacing: .05em; }
+.pdf-bar-name { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .54rem; }
+.pdf-canvas-wrap { padding: 6px; display: flex; justify-content: center; }
+#pdf-canvas { max-width: 100%; display: block; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+/* ── Columns / cells layout ── */
+.col  { display: flex; flex-direction: column; min-height: 0; }
+.col-lbl-range {
+  font-size: .54rem; color: var(--muted); text-align: center;
+  letter-spacing: .06em; padding: 1px 4px 2px; flex-shrink: 0;
+}
+.cells { display: flex; flex-direction: column; flex: 1; gap: 2px; min-height: 0; }
+
+/* ── Nav row ── */
+.nav { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.nav-st   { font-size: .6rem; color: var(--muted); }
+.done-b   { font-size: .55rem; padding: 2px 7px; border-radius: 10px; background: var(--f-bg); border: 1px solid var(--f-brd); color: var(--accent); }
+.nav-q {
+  font-size: .85rem; font-weight: 700; color: var(--accent);
+  min-width: 72px; text-align: center; letter-spacing: .03em;
+}
+
+/* ── Keyboard ref ── */
+.kbd-ref { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; flex-shrink: 0; border-top: 1px solid var(--border); padding-top: 4px; }
+.ki  { font-size: .54rem; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+kbd  { background: var(--panel); border: 1px solid var(--border); border-bottom: 2px solid var(--border); border-radius: 3px; padding: 0 4px; font-family: inherit; font-size: .54rem; color: var(--text); }
+
+/* ── Ambit sections in grid ── */
+.sect { display: flex; flex-direction: column; gap: 3px; min-height: 0; flex: 1; }
+.sect-hdr {
+  font-size: .58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  color: #fff; padding: 2px 8px; border-radius: 4px; flex-shrink: 0;
+}
+.sect-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+  flex: 1; min-height: 0;
+}
+
+/* ── 2-col layout (mat/cat) ── */
+.mat-col { display: flex; flex-direction: column; gap: 6px; min-height: 0; height: 100%; }
+.grid-narrow {
+  max-width: 460px; width: 100%; margin: 0 auto;
+}

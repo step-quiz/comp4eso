@@ -1,0 +1,31 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   tokens.css — Design tokens (CSS custom properties) and base resets.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg:      #f0f0f0;
+  --panel:   #ffffff;
+  --border:  #d0d0d0;
+  --accent:  #1a4f8a;
+  --acc-hi:  #3a7abf;
+  --text:    #111111;
+  --muted:   #666666;
+  --f-bg:    #e8f0f8;
+  --f-brd:   #90b4d8;
+  --act-bg:  #3a7abf;
+  --act-txt: #ffffff;
+  --cAns:    #000000;
+  --cBlank:  #888888;
+  --cInv:    #555555;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  height: 100dvh; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  display: flex; flex-direction: column;
+  padding: 7px 10px 6px; gap: 5px;
+  user-select: none;
+}

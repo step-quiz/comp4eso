@@ -1,0 +1,26 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   animations.css — Keyframe definitions used by other stylesheets via
+   `animation:` declarations. Loading order matters: this file must be
+   imported alongside the others; the keyframe names are referenced from
+   components.css and layout.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+@keyframes pulse-border {
+  from { border-color: var(--acc-hi); }
+  to   { border-color: var(--border); }
+}
+
+@keyframes pop-in {
+  from { transform: scale(.85); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes warning-pop {
+  from { transform: scale(.88); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
