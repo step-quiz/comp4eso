@@ -10,24 +10,54 @@
 
 | Phase | Scope | Status | Notes |
 |---|---|---|---|
-| **1** | Step 1 — CSS extraction + directory scaffold | ✅ **Done** | `styles/{tokens,layout,components,animations}.css` produced; `index.html` rewired with `<link>` tags. JS still inline in `<body>`. App is fully functional and visually identical to the original. 216 of 216 selectors preserved (verified). |
-| 2 | Steps 2–4 — Year-data extraction + state.js + render.js | ⏳ Pending | Highest-value step. Conversion to ES modules requires also rewiring `onclick` handlers (Step 18) so that JS becomes module-scoped. Plan to bundle steps 2–18 into Phase 2 because they are tightly coupled. |
-| 3 | Steps 5–17 — Remaining JS module extraction | ⏳ Pending | (May be folded into Phase 2 if the agent prefers a single big-bang switch to ES modules.) |
-| 4 | Step 18 — Final `index.html` cleanup | ⏳ Pending | Remove all inline `onclick`/`onchange`; load only `js/init.js` as a module. |
+| **1** | Step 1 — CSS extraction + directory scaffold | ✅ **Done** | `styles/{tokens,layout,components,animations}.css` produced; `index.html` rewired with `<link>` tags. JS still inline. App is fully functional and visually identical to the original. 216 of 216 selectors preserved (verified). |
+| **2** | Steps 2–18 — Full ES module conversion | ✅ **Done** | Year-data extracted to `data/{cat,mat,ct}-2025-26.js`; competency registry at `data/competencies.js`; 16 JS modules under `js/`; bootstrap at `js/init.js`; `index.html` reduced from 3 675 lines (165 KB) to 404 lines (17 KB). All inline `on*=` handlers replaced by `addEventListener` wired in `init.js`. Validation: zero import-resolution errors, zero ES-module cycles, zero Node syntax errors, every `getElementById` ID exists in the HTML. |
+| 3 | Future — additional polish | ⏳ Optional | Possible follow-ups: jsdoc types for all modules; vitest unit tests for `scoring.js` and `render.js`; e2e tests for the answer-entry flow; tree-shake the unused `getColInfo` etc. |
 
-After Phase 1, the deployable artifact is:
+After Phase 2, the deployable artifact is:
 
 ```
 project-root/
-├── index.html                  ← styles externalised, JS still inline
-└── styles/
-    ├── tokens.css
-    ├── animations.css
-    ├── layout.css
-    └── components.css
+├── index.html              ← shell: links 4 stylesheets, loads js/init.js as ES module
+├── styles/                 ← 4 stylesheets (216 rules total)
+│   ├── tokens.css
+│   ├── animations.css
+│   ├── layout.css
+│   └── components.css
+├── data/                   ← year-variable data — change here for next academic year
+│   ├── cat-2025-26.js
+│   ├── mat-2025-26.js
+│   ├── ct-2025-26.js
+│   └── competencies.js     ← stable registry; only this file is imported by code outside data/
+└── js/                     ← 16 modules
+    ├── state.js            ← single source of truth (mutable state + persistence)
+    ├── render.js           ← DOM sync; uses competencies registry
+    ├── grid.js             ← grid construction (cells, columns)
+    ├── keyboard.js         ← key config + settings modal
+    ├── main-keyboard.js    ← top-level answer-entry handler
+    ├── navigation.js       ← prev/next student, cell movement, goBack
+    ├── student-modal.js    ← student creation / inline rename / completion prompt
+    ├── pdf-viewer.js       ← pdf.js wrapper (uses runtime state from state.js)
+    ├── key-editor.js       ← answer-key editor + load/save
+    ├── scoring.js          ← scoring + results table + getGrade (shared)
+    ├── export.js           ← XLSX export/import + results download
+    ├── reports.js          ← DOCX report generator (only module besides
+    │                          competencies.js that imports year-data directly)
+    ├── ui.js               ← toast, FAQ, dropdowns, global ESC, beforeunload
+    ├── centre.js           ← centre/curs modal + autocomplete
+    ├── startup.js          ← startup wizard + applyCompetency
+    └── init.js             ← entry point: bootstraps, wires DOM events
 ```
 
-The CDN `<script>` tags (xlsx, exceljs, pdf.js, jszip) and the inline `<script>` block at the end of `<body>` remain untouched.
+Cycles between modules are broken via setter-injection callbacks wired in `init.js`:
+- `pdf-viewer.setOpenModalFn(openModal)` (from `student-modal`)
+- `key-editor.setApplyCompetencyFn(applyCompetency)` and `export.setApplyCompetencyFn(applyCompetency)` (from `startup`)
+- `centre.setGenerateInformesFn(generateInformes)` (from `reports`)
+- `centre.setOnCentreChanged(updateCentreFromWizard)` (from `startup`)
+- `ui.setCloseSettingsFn(closeSettings)` and `ui.setCloseKeyEditorFn(closeKeyEditor)` (to break ui ↔ key-editor cycle for `closeOverlay`)
+- `key-editor.setAfterKeyEditorFn(afterKeyEditor)` (wired inside `startup.js` itself)
+
+External CDN globals are accessed via `window.X`: `window.ExcelJS`, `window.pdfjsLib`, `window.JSZip`. These remain loaded as classic `<script>` tags before `js/init.js`.
 
 ---
 
