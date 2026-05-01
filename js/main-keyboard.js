@@ -9,7 +9,7 @@
 
 import {
   getCurIdx, getQIdx, setQIdx,
-  getStuMap, getStuOrder,
+  getStuOrder, setStudentAnswer,
   isStuCompletePrompt,
   markUnsaved,
 } from './state.js';
@@ -74,9 +74,8 @@ export function initMainKeyboard() {
     const curIdx = getCurIdx();
     if (val !== undefined && curIdx >= 0) {
       e.preventDefault();
-      const stuMap = getStuMap();
       const stuOrder = getStuOrder();
-      stuMap[stuOrder[curIdx]][qIdx] = val;
+      setStudentAnswer(stuOrder[curIdx], qIdx, val);
       markUnsaved();
       if (qIdx < Q - 1) {
         setQIdx(qIdx + 1);
