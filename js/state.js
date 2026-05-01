@@ -26,12 +26,11 @@ function _loadAmbits() {
 }
 
 export function getDefaultCurs() {
+  // Academic year boundary: 1 September Y → 31 August Y+1 = curs "Y-(Y+1)".
   const now = new Date();
   const m = now.getMonth() + 1;
   const y = now.getFullYear();
-  if (m >= 9) return `${y}-${y + 1}`;
-  if (m <= 6) return `${y - 1}-${y}`;
-  return `${y}-${y + 1}`;
+  return m >= 9 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
 }
 
 // ── Module-private state ──
@@ -97,6 +96,15 @@ export const setPdfZoom             = v => { _pdfZoom = v; };
 
 export function markUnsaved() { _unsavedChanges = true; }
 export function markSaved()   { _unsavedChanges = false; }
+
+// ── Granular setter for individual student answers ──
+// Consumers should use this rather than mutating the object returned
+// by getStuMap() directly, even though that would also work — going
+// through this setter preserves the "mutate via setters" contract
+// declared at the top of this file.
+export function setStudentAnswer(key, qIdx, value) {
+  _stuMap[key][qIdx] = value;
+}
 
 // ── Persisted state setters ──
 export function setCentreCfg(cfg) {

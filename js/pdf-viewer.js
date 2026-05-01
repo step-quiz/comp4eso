@@ -55,7 +55,6 @@ export async function loadPdfFile(input) {
     setPdfTotalPages(doc.numPages);
     document.body.classList.add('has-pdf');
     document.getElementById('pdf-bar-name').textContent = file.name;
-    document.getElementById('pdf-prompt-overlay').classList.add('off');
     updatePdfToggleBtn();
     const curIdx = getCurIdx();
     const stuOrder = getStuOrder();
@@ -68,11 +67,6 @@ export async function loadPdfFile(input) {
   } catch (err) {
     alert('Error carregant el PDF: ' + err.message);
   }
-}
-
-export function skipPdf() {
-  document.getElementById('pdf-prompt-overlay').classList.add('off');
-  _openModal();
 }
 
 export function changePdfZoom(delta) {

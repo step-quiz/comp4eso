@@ -159,8 +159,8 @@ export async function importRespostes(input) {
       const targetLabel = COMPETENCIES[importCompId].label;
       const currentLabel = COMPETENCIES[currentCompetencyId]?.label || currentCompetencyId;
       if (!confirm(
-        `Aquest fitxer és per a la competència «${targetLabel}», ` +
-        `però ara teniu «${currentLabel}» activa.\n\n` +
+        `⚠ Atenció — l'arxiu de càlcul no correspon a la competència que estàs avaluant.\n\n` +
+        `Aquest fitxer és per a «${targetLabel}», però ara teniu «${currentLabel}» activa.\n\n` +
         `Voleu canviar a «${targetLabel}» i carregar les dades?`
       )) return;
       _applyCompetency(importCompId);
@@ -260,6 +260,7 @@ export async function importRespostes(input) {
 
     if (getAnswerKey()) document.getElementById('btn-correct').disabled = false;
 
+    markSaved();
     alert(`✓ ${newStuOrder.length} alumne${newStuOrder.length !== 1 ? 's' : ''} carregats correctament.`);
 
   } catch (err) {

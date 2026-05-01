@@ -6,7 +6,7 @@ import {
   getStuMap, getStuNames, getStuOrder, setStuOrder,
   getCurIdx, setCurIdx, setQIdx,
   isStuCompletePrompt, setStuCompletePrompt,
-  markUnsaved,
+  markUnsaved, markSaved,
 } from './state.js';
 import { getQ, render } from './render.js';
 import { syncPdfToCurrent, syncPdfToNextSlot } from './pdf-viewer.js';
@@ -117,6 +117,7 @@ export function clearAllData() {
   setCurIdx(-1);
   setQIdx(0);
   hideCompletePrompt();
+  markSaved();
   render();
   openModal();
 }

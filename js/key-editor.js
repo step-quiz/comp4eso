@@ -9,6 +9,7 @@ import {
   getStuMap, getStuNames, getStuOrder,
   setCurIdx, setQIdx,
   getAnswerKey, setAnswerKey,
+  markSaved,
 } from './state.js';
 import { getQ, getAmbitForQ, getAmbitRanges, getItemType, valDisplay } from './render.js';
 import { getKeyCfg, normalizeKey } from './keyboard.js';
@@ -216,6 +217,7 @@ export function loadKeyTxt(input) {
           setCurIdx(-1);
           setQIdx(0);
           hideCompletePrompt();
+          markSaved();
         }
         _applyCompetency(data.COMPETENCIA);
         currentId = getCurrentCompetencyId();

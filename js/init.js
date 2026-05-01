@@ -18,7 +18,7 @@ import { buildGrid } from './grid.js';
 import { render } from './render.js';
 import {
   initPdfWorker, initPdfResizeListener, setOpenModalFn,
-  togglePdfPane, loadPdfFile, skipPdf, changePdfZoom,
+  togglePdfPane, loadPdfFile, changePdfZoom,
 } from './pdf-viewer.js';
 import {
   openModal, confirmStudent, clearAllData, editNameInline,
@@ -129,10 +129,6 @@ on('btn-accept-warning', 'click', acceptWarning);
 
 // Student modal
 on('btn-confirm-student', 'click', confirmStudent);
-
-// PDF prompt
-on('btn-load-pdf',  'click', () => document.getElementById('pdf-file').click());
-on('btn-skip-pdf',  'click', skipPdf);
 
 // PDF zoom buttons
 on('btn-pdf-zoom-out', 'click', () => changePdfZoom(-0.15));

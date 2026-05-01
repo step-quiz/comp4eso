@@ -21,7 +21,6 @@ import {
 } from './student-modal.js';
 import { moveCell, goBack } from './navigation.js';
 import { nextStu } from './navigation.js';
-import { skipPdf } from './pdf-viewer.js';
 
 export function initMainKeyboard() {
   document.addEventListener('keydown', e => {
@@ -37,11 +36,6 @@ export function initMainKeyboard() {
       !document.getElementById('faq-overlay').classList.contains('off')     ||
       !document.getElementById('centre-overlay').classList.contains('off');
 
-    const pdfPromptOpen = !document.getElementById('pdf-prompt-overlay').classList.contains('off');
-    if (pdfPromptOpen) {
-      if (e.key === 'Escape') { e.preventDefault(); skipPdf(); }
-      return;
-    }
     if (anyModalOpen) return;
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
 

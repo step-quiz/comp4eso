@@ -18,7 +18,7 @@ import {
 } from './key-editor.js';
 import { openModal } from './student-modal.js';
 
-export const startupSel = { comp: null, key: null, pdf: null };
+export const startupSel = { comp: null, key: null };
 
 let _pendingAfterWarning = null;
 
@@ -69,10 +69,7 @@ export function acceptWarning() {
 
 export function afterKeyEditor() {
   const pending = getPendingAfterKey();
-  if (pending === 'pdf') {
-    setPendingAfterKey(null);
-    document.getElementById('pdf-prompt-overlay').classList.remove('off');
-  } else if (pending === 'student') {
+  if (pending === 'student') {
     setPendingAfterKey(null);
     openModal();
   }
