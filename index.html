@@ -396,6 +396,43 @@
       🤖 Reconeixement automàtic de respostes
     </div>
 
+    <!-- Competència -->
+    <label style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px">
+      Competència de la prova
+    </label>
+    <select id="ai-rec-competency"
+      style="width:100%;margin-bottom:14px;padding:6px 8px;font-size:.72rem;
+             border:1.5px solid var(--border);border-radius:6px;background:var(--surface);
+             color:var(--text);font-family:var(--font-mono)">
+      <option value="mat">Matemàtiques (32 ítems, abcd)</option>
+      <option value="cat">Llengua catalana (44 ítems, abcd + V/F)</option>
+      <option value="ct">Científico-tecnològica (40 ítems, abcd/abcde/bin)</option>
+    </select>
+
+    <!-- Model i resolució -->
+    <div style="display:flex;gap:10px;margin-bottom:14px">
+      <div style="flex:1">
+        <label style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px">
+          Model
+        </label>
+        <select id="ai-rec-model"
+          style="width:100%;padding:6px 8px;font-size:.7rem;
+                 border:1.5px solid var(--border);border-radius:6px;background:var(--surface);
+                 color:var(--text);cursor:pointer">
+        </select>
+      </div>
+      <div style="flex:1">
+        <label style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px">
+          Resolució
+        </label>
+        <select id="ai-rec-scale"
+          style="width:100%;padding:6px 8px;font-size:.7rem;
+                 border:1.5px solid var(--border);border-radius:6px;background:var(--surface);
+                 color:var(--text);cursor:pointer">
+        </select>
+      </div>
+    </div>
+
     <!-- API Key -->
     <label style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px">
       API Key d'Anthropic
