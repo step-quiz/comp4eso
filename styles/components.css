@@ -429,3 +429,8 @@ td.blnk { color: var(--muted); text-align: center; }
 .key-grid-wrap   { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3px; }
 #key-grid .sect-hdr { background: #555 !important; color: #fff; }
 #key-grid .cell     { border-left-color: #999 !important; }
+
+/* ── AI Recognizer log ── */
+.ai-log-ok  { color: var(--text); padding: 1px 0; }
+.ai-log-err { color: #cc4444;     padding: 1px 0; }
+#ai-rec-log:not(:empty) { display: block !important; }

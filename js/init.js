@@ -54,6 +54,10 @@ import {
 import { generateInformes } from './reports.js';
 import { closeSettings } from './keyboard.js';
 import { initMainKeyboard } from './main-keyboard.js';
+import {
+  openAiRecognizer, closeAiRecognizer,
+  startAiRecognition, processAiPdf,
+} from './ai-recognizer.js';
 
 // ─── 1. Wire setter-injection callbacks ───────────────────────────────
 setOpenModalFn(openModal);
@@ -95,6 +99,8 @@ on('hdr-name',      'click', editNameInline);
 on('dd-accions-trigger', 'click', () => toggleDropdown('dd-accions'));
 on('dd-cfg-trigger',     'click', () => toggleDropdown('dd-cfg'));
 
+on('dd-ai-recognizer', 'click', () => { closeDropdowns(); openAiRecognizer(); });
+
 // Dropdown items — Accions
 on('dd-import-xlsx', 'click', () => { closeDropdowns(); document.getElementById('import-xlsx-file').click(); });
 on('dd-export-xlsx', 'click', () => { closeDropdowns(); exportRespostes(); });
@@ -109,9 +115,15 @@ on('dd-settings', 'click', () => { closeDropdowns(); openSettings(); });
 on('dd-faq',      'click', () => { closeDropdowns(); openFaq(); });
 
 // File inputs (hidden)
-on('import-xlsx-file', 'change', e => importRespostes(e.target));
-on('key-txt-file',     'change', e => loadKeyTxt(e.target));
-on('pdf-file',         'change', e => loadPdfFile(e.target));
+on('import-xlsx-file',  'change', e => importRespostes(e.target));
+on('key-txt-file',      'change', e => loadKeyTxt(e.target));
+on('pdf-file',          'change', e => loadPdfFile(e.target));
+on('ai-rec-pdf-file',   'change', e => processAiPdf(e.target));
+on('ai-rec-btn-start',  'click',  startAiRecognition);
+on('ai-rec-toggle-key', 'click',  () => {
+  const inp = document.getElementById('ai-rec-apikey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+});
 
 // Startup wizard
 on('startup-go', 'click', startApp);

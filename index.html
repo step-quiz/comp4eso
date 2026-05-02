@@ -26,6 +26,8 @@
         <button class="dd-item" id="dd-key-editor">🔑&nbsp; Introduir la clau</button>
         <button class="dd-item" id="btn-correct" disabled>📊&nbsp; Corregir i elaborar informes</button>
         <div class="dd-sep"></div>
+        <button class="dd-item" id="dd-ai-recognizer">🤖&nbsp; Reconeixement automàtic de respostes</button>
+        <div class="dd-sep"></div>
         <button class="dd-item" id="dd-import-xlsx">📂&nbsp; Carregar dades</button>
         <button class="dd-item" id="dd-export-xlsx">💾&nbsp; Desar les dades introduïdes</button>
       </div>
@@ -64,7 +66,8 @@
 </div>
 
 <input type="file" id="key-txt-file" accept=".txt" style="display:none">
-<input type="file" id="pdf-file" accept=".pdf" style="display:none">
+<input type="file" id="pdf-file"        accept=".pdf" style="display:none">
+<input type="file" id="ai-rec-pdf-file" accept=".pdf" style="display:none">
 <input type="file" id="import-xlsx-file" accept=".xlsx" style="display:none">
 
 <div class="prog-wrap"><div class="prog-fill" id="prog" style="width:0%"></div></div>
@@ -384,4 +387,63 @@
 </div>
 
 <script type="module" src="js/init.js"></script>
+
+<!-- ═══ MODAL: Reconeixement automàtic de respostes ═══ -->
+<div class="overlay off" id="ai-rec-overlay" data-backdrop-close="self">
+  <div class="modal" style="min-width:340px;max-width:520px;width:90vw">
+
+    <div style="font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:14px">
+      🤖 Reconeixement automàtic de respostes
+    </div>
+
+    <!-- API Key -->
+    <label style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px">
+      API Key d'Anthropic
+    </label>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input id="ai-rec-apikey" type="password" class="name-input"
+        placeholder="sk-ant-api03-..."
+        autocomplete="off"
+        style="flex:1;font-family:var(--font-mono);font-size:.7rem;letter-spacing:.04em">
+      <button id="ai-rec-toggle-key"
+        style="padding:4px 10px;font-size:.7rem;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;color:var(--muted)"
+        title="Mostrar / amagar">👁</button>
+    </div>
+    <div style="font-size:.6rem;color:var(--muted);margin-bottom:16px">
+      La clau no es desa en cap lloc. Només s'usa durant aquesta sessió.
+    </div>
+
+    <!-- Barra de progrés -->
+    <div style="background:var(--border);border-radius:6px;height:6px;overflow:hidden;margin-bottom:8px">
+      <div id="ai-rec-bar" style="height:100%;width:0%;background:var(--accent);transition:width .3s ease;border-radius:6px"></div>
+    </div>
+
+    <!-- Estat -->
+    <div id="ai-rec-status"
+      style="font-size:.62rem;color:var(--muted);min-height:1.4em;margin-bottom:8px"></div>
+
+    <!-- Log de resultats -->
+    <div id="ai-rec-log"
+      style="font-size:.62rem;line-height:1.6;max-height:180px;overflow-y:auto;
+             background:var(--surface);border:1px solid var(--border);border-radius:7px;
+             padding:8px 10px;margin-bottom:16px;display:none">
+    </div>
+
+    <!-- Botons -->
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="ai-rec-btn-close" class="dd-item danger"
+        style="padding:7px 16px;font-size:.68rem"
+        onclick="document.getElementById('ai-rec-overlay').classList.add('off')">
+        Tancar
+      </button>
+      <button id="ai-rec-btn-start"
+        style="padding:7px 18px;font-size:.68rem;font-weight:700;
+               background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer">
+        📄 Seleccionar PDF i iniciar
+      </button>
+    </div>
+
+  </div>
+</div>
+
 </body></html>
