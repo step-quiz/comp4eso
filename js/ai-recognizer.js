@@ -34,25 +34,50 @@ import { showToast } from './ui.js';
 
 // ─── Constants ────────────────────────────────────────────────────────
 
-const API_URL     = 'https://api.anthropic.com/v1/messages';
-const MAX_RETRIES = 3;
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const GEMINI_API_BASE   = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// Models disponibles, en ordre de preferència. La primera entrada és la default.
+// Reintents diferenciats segons tipus d'error:
+// - Errors transitoris (5xx, 429 Too Many Requests, errors de xarxa):
+//   són típicament caigudes momentànies del servidor o rate limiting,
+//   solen recuperar-se sols. Provem 5 vegades amb backoff generós.
+// - Altres errors (4xx no-429, errors de parse JSON, errors de validació):
+//   probablement no es resoldran amb temps. Limitem a 3 intents.
+const MAX_RETRIES_TRANSIENT = 5;
+const MAX_RETRIES_DEFAULT   = 3;
+
+// Backoff explícit per posició (en ms). Valors més generosos per donar temps
+// als servidors de Gemini/Anthropic a recuperar-se davant de degradacions.
+const RETRY_BACKOFF_MS = [5000, 10000, 15000, 40000];
+
+// Models disponibles. Cada entrada té un `provider` que determina endpoint,
+// headers i format del payload.
+// Ordre escollit segons els resultats empírics del nostre testing:
+// Gemini 2.5 Pro va donar 100% de precisió a 288 DPI (millor que Claude Opus 4.7).
 const MODEL_CHOICES = [
-  { id: 'claude-opus-4-7',   label: 'Opus 4.7 — més precís (recomanat)' },
-  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 — equilibri qualitat/cost' },
-  { id: 'claude-haiku-4-5',  label: 'Haiku 4.5 — més ràpid i econòmic' },
+  { id: 'gemini-2.5-pro',         provider: 'google',    label: 'Gemini 2.5 Pro — màxima precisió (recomanat)' },
+  { id: 'claude-opus-4-7',        provider: 'anthropic', label: 'Claude Opus 4.7 — alternativa Anthropic (potent)' },
+  { id: 'gemini-2.5-flash',       provider: 'google',    label: 'Gemini 2.5 Flash — equilibri qualitat/cost' },
+  { id: 'claude-sonnet-4-6',      provider: 'anthropic', label: 'Claude Sonnet 4.6 — equilibri qualitat/cost' },
+  { id: 'gemini-2.5-flash-lite',  provider: 'google',    label: 'Gemini 2.5 Flash-Lite — el més econòmic' },
+  { id: 'claude-haiku-4-5',       provider: 'anthropic', label: 'Claude Haiku 4.5 — més ràpid i econòmic' },
 ];
 const DEFAULT_MODEL = MODEL_CHOICES[0].id;
 
+function _modelInfo(id) {
+  return MODEL_CHOICES.find(m => m.id === id) || MODEL_CHOICES[0];
+}
+
 // Escales possibles per al renderitzat de PDF. ≈DPI = scale × 72.
-// Recomanació: 3.0 detecta cercles fins (regla 4) sense inflar tokens.
+// 4.0 (288 DPI) és el default segons les nostres proves: detecta cercles fins
+// i marques tènues amb molta més fiabilitat que resolucions inferiors.
+// El cost extra és menyspreable (les imatges es limiten a 1800px de costat).
 const SCALE_CHOICES = [
+  { val: '4.0', label: '≈288 DPI (màxima qualitat, recomanat)' },
+  { val: '3.0', label: '≈216 DPI (equilibri qualitat/cost)' },
   { val: '2.0', label: '≈144 DPI (ràpid, més econòmic)' },
-  { val: '3.0', label: '≈216 DPI (recomanat)' },
-  { val: '4.0', label: '≈288 DPI (màxima qualitat)' },
 ];
-const DEFAULT_SCALE = '3.0';
+const DEFAULT_SCALE = '4.0';
 
 const PROMPT_SISTEMA =
   'Ets un sistema OMR (Optical Mark Recognition) especialitzat en ' +
@@ -129,6 +154,8 @@ function _ensureControlsPopulated() {
       if (m.id === DEFAULT_MODEL) opt.selected = true;
       modelSel.appendChild(opt);
     });
+    // Actualitzar el placeholder i la label de l'API key segons el model triat.
+    modelSel.addEventListener('change', _updateApiKeyHint);
   }
   const scaleSel = document.getElementById('ai-rec-scale');
   if (scaleSel && scaleSel.options.length === 0) {
@@ -139,6 +166,23 @@ function _ensureControlsPopulated() {
       if (s.val === DEFAULT_SCALE) opt.selected = true;
       scaleSel.appendChild(opt);
     });
+  }
+  _updateApiKeyHint();
+}
+
+// Reflecteix al UI quin proveïdor s'està utilitzant: canvia placeholder i label.
+function _updateApiKeyHint() {
+  const sel = document.getElementById('ai-rec-model');
+  const inp = document.getElementById('ai-rec-apikey');
+  const lbl = document.getElementById('ai-rec-apikey-label');
+  if (!sel || !inp) return;
+  const info = _modelInfo(sel.value || DEFAULT_MODEL);
+  if (info.provider === 'google') {
+    inp.placeholder = 'AIzaSy...';
+    if (lbl) lbl.textContent = "API Key de Google (Gemini)";
+  } else {
+    inp.placeholder = 'sk-ant-api03-...';
+    if (lbl) lbl.textContent = "API Key d'Anthropic (Claude)";
   }
 }
 
@@ -151,7 +195,10 @@ export function closeAiRecognizer() {
 export function startAiRecognition() {
   const apiKey = document.getElementById('ai-rec-apikey').value.trim();
   if (!apiKey) {
-    alert("Cal introduir una API key d'Anthropic per continuar.");
+    const sel  = document.getElementById('ai-rec-model');
+    const info = _modelInfo(sel?.value || DEFAULT_MODEL);
+    const which = info.provider === 'google' ? 'de Google (Gemini)' : "d'Anthropic (Claude)";
+    alert(`Cal introduir una API key ${which} per continuar.`);
     return;
   }
   document.getElementById('ai-rec-pdf-file').click();
@@ -191,15 +238,25 @@ export async function processAiPdf(input) {
 
       try {
         const result  = await _processPage(pdfDoc, p, apiKey, competency, items, model, scale);
-        const valides = Object.values(result.respostes)
-          .filter(v => v && v !== '?' && v !== '').length;
         results.push(result);
-        _appendLog(
-          `Pàg. ${p} — <strong>${_esc(result.id_alumne || '(sense nom)')}</strong>` +
-          ` — ${valides}/${Q} respostes` +
-          (result.comentari ? ` — <em>${_esc(result.comentari.slice(0, 80))}</em>` : ''),
-          'ok'
-        );
+
+        if (result._failed) {
+          // Tots els reintents han fallat. La pàgina queda buida amb el missatge
+          // d'error per propagar-lo al toast final.
+          _appendLog(
+            `Pàg. ${p} — <strong>ERROR D'API</strong> — ${_esc(result._error)}`,
+            'err'
+          );
+        } else {
+          const valides = Object.values(result.respostes)
+            .filter(v => v && v !== '?' && v !== '').length;
+          _appendLog(
+            `Pàg. ${p} — <strong>${_esc(result.id_alumne || '(sense nom)')}</strong>` +
+            ` — ${valides}/${Q} respostes` +
+            (result.comentari ? ` — <em>${_esc(result.comentari.slice(0, 80))}</em>` : ''),
+            'ok'
+          );
+        }
       } catch (err) {
         _appendLog(`Pàg. ${p} — Error: ${_esc(err.message)}`, 'err');
         console.error(`Page ${p}:`, err);
@@ -250,57 +307,198 @@ async function _processPage(pdfDoc, pageNum, apiKey, competency, items, model, s
 
   const base64 = src.toDataURL('image/jpeg', 0.85).split(',')[1];
   const prompt = buildOmrPrompt(competency);
+  const provider = _modelInfo(model).provider;
 
   let lastErr = null;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  let attempt = 0;
+  while (true) {
+    attempt++;
     try {
-      const resp = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 2000,
-          system: PROMPT_SISTEMA,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-              { type: 'text',  text: prompt },
-            ],
-          }],
-        }),
-      });
+      const text = (provider === 'google')
+        ? await _callGemini(apiKey, model, base64, prompt)
+        : await _callAnthropic(apiKey, model, base64, prompt);
 
-      if (!resp.ok) {
-        let msg = `HTTP ${resp.status}`;
-        try { const e = await resp.json(); msg = e.error?.message || msg; } catch (_) {}
-        throw new Error(msg);
+      let clean = text.trim();
+      if (clean.startsWith('```')) {
+        clean = clean.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
       }
 
-      const data = await resp.json();
-      let text = (data.content.find(b => b.type === 'text')?.text || '').trim();
-      if (text.startsWith('```')) {
-        text = text.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
-      }
-
-      return _validarResposta(JSON.parse(text), items);
+      return _validarResposta(JSON.parse(clean), items);
 
     } catch (err) {
       lastErr = err;
-      if (attempt < MAX_RETRIES && !(err instanceof SyntaxError)) {
-        await _sleep(2000 * attempt);
-      }
+
+      // Decideix si val la pena reintentar i quan
+      const isTransient = _isTransientError(err);
+      const maxAttempts = isTransient ? MAX_RETRIES_TRANSIENT : MAX_RETRIES_DEFAULT;
+
+      if (attempt >= maxAttempts) break;
+
+      // Backoff: agafem el valor de la taula segons el número d'intents fallits.
+      // Si superem la taula, repetim l'últim valor (saturem).
+      const backoffIdx = Math.min(attempt - 1, RETRY_BACKOFF_MS.length - 1);
+      const wait = RETRY_BACKOFF_MS[backoffIdx];
+      console.warn(`[AI] Intent ${attempt} fallat (${isTransient ? 'transitori' : 'permanent'}: ${err.message}). Esperant ${wait}ms abans del següent...`);
+      await _sleep(wait);
     }
   }
 
+  // Tots els intents han fallat. Marquem el resultat amb un flag d'error
+  // perquè la UI pugui mostrar un toast clar.
   const respostes = {};
   items.forEach((_, i) => { respostes[`Q${String(i + 1).padStart(2, '0')}`] = '?'; });
-  return { id_alumne: '', respostes, comentari: `ERROR: ${lastErr?.message}` };
+  return {
+    id_alumne: '',
+    respostes,
+    comentari: `ERROR: ${lastErr?.message}`,
+    _failed: true,    // ← flag per a la UI
+    _error: lastErr?.message || 'Error desconegut',
+  };
+}
+
+// ─── Classificació d'errors per al retry ─────────────────────────────
+//
+// Errors transitoris (val la pena reintentar amb backoff llarg):
+//   - HTTP 429 (Too Many Requests / quota momentània)
+//   - HTTP 5xx (Service Unavailable, Internal Error, Bad Gateway...)
+//   - TypeError / errors de xarxa (fetch ha fallat sense response)
+//
+// Errors permanents (reintents limitats):
+//   - HTTP 4xx no-429 (auth, permisos, payload invàlid...)
+//   - SyntaxError de JSON (la IA ha tornat brossa, repetir potser dóna el mateix)
+//   - Errors d'aplicació (safety, max_tokens, recitation...)
+function _isTransientError(err) {
+  const status = err?.httpStatus;
+  if (typeof status === 'number') {
+    if (status === 429) return true;
+    if (status >= 500 && status < 600) return true;
+    return false;  // 4xx no-429 = permanent
+  }
+  // Sense codi HTTP: probablement error de xarxa (fetch failure, timeout...)
+  // o error d'aplicació. Si el missatge diu "Failed to fetch" o similar,
+  // tractem-ho com a transitori.
+  if (err instanceof SyntaxError) return false;
+  const msg = String(err?.message || '').toLowerCase();
+  if (msg.includes('failed to fetch') || msg.includes('network') || msg.includes('timeout')) {
+    return true;
+  }
+  return false;
+}
+
+// ─── Crida a Anthropic ───────────────────────────────────────────────
+
+async function _callAnthropic(apiKey, model, base64, prompt) {
+  const resp = await fetch(ANTHROPIC_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 2000,
+      system: PROMPT_SISTEMA,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+          { type: 'text',  text: prompt },
+        ],
+      }],
+    }),
+  });
+
+  if (!resp.ok) {
+    let msg = `HTTP ${resp.status}`;
+    try { const e = await resp.json(); msg = e.error?.message || msg; } catch (_) {}
+    const err = new Error(msg);
+    err.httpStatus = resp.status;
+    throw err;
+  }
+
+  const data = await resp.json();
+  return data.content.find(b => b.type === 'text')?.text || '';
+}
+
+// ─── Crida a Google Gemini ───────────────────────────────────────────
+//
+// Gemini té dues diferències importants respecte Anthropic:
+//   1. La clau va a la URL com a query param (?key=...).
+//   2. Té un flag `responseMimeType: "application/json"` que força sortida
+//      JSON vàlida — això elimina d'arrel els ```json``` que Claude posa
+//      a vegades. Per això, després de la crida, no cal el strip de fences.
+//
+// El system prompt es passa com a `systemInstruction.parts[0].text`.
+// El text + imatge van junts a `contents[0].parts[]`.
+
+async function _callGemini(apiKey, model, base64, prompt) {
+  const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: PROMPT_SISTEMA }],
+      },
+      contents: [{
+        role: 'user',
+        parts: [
+          { inlineData: { mimeType: 'image/jpeg', data: base64 } },
+          { text: prompt },
+        ],
+      }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        maxOutputTokens: 2000,
+        temperature: 0,
+      },
+    }),
+  });
+
+  if (!resp.ok) {
+    let msg = `HTTP ${resp.status}`;
+    let errBody = null;
+    try {
+      errBody = await resp.json();
+      msg = errBody.error?.message || msg;
+    } catch (_) {}
+    const err = new Error(msg);
+    err.httpStatus = resp.status;
+    throw err;
+  }
+
+  const data = await resp.json();
+
+  const candidate = data.candidates?.[0];
+  if (!candidate) {
+    const blockReason = data.promptFeedback?.blockReason;
+    if (blockReason) {
+      throw new Error(`Gemini ha bloquejat el prompt (raó: ${blockReason}). Mira la consola per detalls.`);
+    }
+    throw new Error('Gemini no ha retornat cap candidat. Mira la consola.');
+  }
+
+  // Casos finishReason que volem reportar específicament
+  const fr = candidate.finishReason;
+  if (fr === 'SAFETY') {
+    throw new Error(`Gemini ha refusat per polítiques de seguretat. Ratings: ${JSON.stringify(candidate.safetyRatings)}`);
+  }
+  if (fr === 'MAX_TOKENS') {
+    throw new Error('Gemini ha retallat la resposta (MAX_TOKENS). Cal augmentar maxOutputTokens.');
+  }
+  if (fr === 'RECITATION') {
+    throw new Error('Gemini ha refusat per "RECITATION" (similitud amb material protegit).');
+  }
+
+  const txt = candidate.content?.parts?.find(p => p.text)?.text;
+  if (!txt) {
+    throw new Error(`Gemini ha retornat una resposta sense text (finishReason=${fr}).`);
+  }
+
+  return txt;
 }
 
 // ─── Validació de la resposta de Claude ──────────────────────────────
@@ -310,10 +508,12 @@ function _validarResposta(data, items) {
   const respostes = {};
   items.forEach((_, i) => {
     const qid = `Q${String(i + 1).padStart(2, '0')}`;
-    let v = String(raw[qid] ?? '?').trim();
+    const rawVal = raw[qid];
+    let v = String(rawVal ?? '?').trim();
     if (v === '') v = '?';
     respostes[qid] = v;
   });
+
   return {
     id_alumne: String(data.id_alumne ?? '').trim(),
     respostes,
@@ -409,13 +609,34 @@ function _loadResultsIntoApp(results, competency, items) {
 
   closeAiRecognizer();
 
+  // Comptem fulls fallats (tots els reintents han esgotat-se per error d'API)
+  // i respostes pendents (cel·les '?' = dubtes que la IA no ha sabut decidir)
+  const failedPages = results.filter(r => r._failed);
   const dubtoses = results.reduce(
     (s, r) => s + Object.values(r.respostes).filter(v => v === '?').length, 0
   );
-  let msg = `✓ ${results.length} alumne${results.length !== 1 ? 's' : ''} carregats via reconeixement automàtic.`;
-  if (dubtoses > 0)
-    msg += ` ⚠️ ${dubtoses} resposta${dubtoses !== 1 ? 's' : ''} pendents de revisió manual (·).`;
-  showToast(msg);
+
+  let msg = '';
+  let urgent = false;
+
+  if (failedPages.length > 0) {
+    // Cas crític: hi ha fulls completament fallats. Toast vermell amb avís fort.
+    urgent = true;
+    const okCount = results.length - failedPages.length;
+    msg = `⚠️ ${failedPages.length} full${failedPages.length !== 1 ? 's' : ''} ` +
+          `${failedPages.length !== 1 ? 'han' : 'ha'} fallat per error d'API ` +
+          `(servidor sobrecarregat o problema de xarxa). ` +
+          `Carregat${okCount !== 1 ? 's' : ''} ${okCount} full${okCount !== 1 ? 's' : ''} OK. ` +
+          `Recomanació: torna a executar el reconeixement més tard, o substitueix ` +
+          `només els fulls fallats (apareixen amb totes les preguntes en blanc).`;
+  } else {
+    msg = `✓ ${results.length} alumne${results.length !== 1 ? 's' : ''} carregats via reconeixement automàtic.`;
+    if (dubtoses > 0) {
+      msg += ` ⚠️ ${dubtoses} resposta${dubtoses !== 1 ? 's' : ''} pendents de revisió manual (·).`;
+    }
+  }
+
+  showToast(msg, urgent ? 8000 : undefined);
 }
 
 // ─── Port de build_omr_prompt() de app_xlsx.py ───────────────────────
