@@ -309,21 +309,32 @@ async function _processPage(pdfDoc, pageNum, apiKey, competency, items, model, s
   const prompt = buildOmrPrompt(competency);
   const provider = _modelInfo(model).provider;
 
+  // Mida de la imatge enviada (per al log de cost)
+  const pixelCount = src.width * src.height;
+
   let lastErr = null;
   let attempt = 0;
   while (true) {
     attempt++;
     try {
-      const text = (provider === 'google')
+      const callResult = (provider === 'google')
         ? await _callGemini(apiKey, model, base64, prompt)
         : await _callAnthropic(apiKey, model, base64, prompt);
+
+      const text = callResult.text;
+      const usage = callResult.usage;
 
       let clean = text.trim();
       if (clean.startsWith('```')) {
         clean = clean.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
       }
 
-      return _validarResposta(JSON.parse(clean), items);
+      const parsed = _validarResposta(JSON.parse(clean), items);
+
+      // Log informatiu d'ús (a la consola). No bloquejant si falten dades.
+      _logPageUsage(pageNum, model, scale, src.width, src.height, pixelCount, usage, parsed);
+
+      return parsed;
 
     } catch (err) {
       lastErr = err;
@@ -419,7 +430,16 @@ async function _callAnthropic(apiKey, model, base64, prompt) {
   }
 
   const data = await resp.json();
-  return data.content.find(b => b.type === 'text')?.text || '';
+  return {
+    text: data.content.find(b => b.type === 'text')?.text || '',
+    usage: {
+      provider: 'anthropic',
+      promptTokens: data.usage?.input_tokens ?? null,
+      outputTokens: data.usage?.output_tokens ?? null,
+      thoughtsTokens: null,    // Claude no exposa thinking tokens al límit estàndard
+      totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+    },
+  };
 }
 
 // ─── Crida a Google Gemini ───────────────────────────────────────────
@@ -507,7 +527,16 @@ async function _callGemini(apiKey, model, base64, prompt) {
     throw new Error(`Gemini ha retornat una resposta sense text (finishReason=${fr}).`);
   }
 
-  return txt;
+  return {
+    text: txt,
+    usage: {
+      provider: 'google',
+      promptTokens: data.usageMetadata?.promptTokenCount ?? null,
+      outputTokens: data.usageMetadata?.candidatesTokenCount ?? null,
+      thoughtsTokens: data.usageMetadata?.thoughtsTokenCount ?? null,
+      totalTokens: data.usageMetadata?.totalTokenCount ?? null,
+    },
+  };
 }
 
 // ─── Validació de la resposta de Claude ──────────────────────────────
@@ -785,3 +814,59 @@ function _appendLog(html, type) {
   log.innerHTML += `<div class="ai-log-${type}">${html}</div>`;
   log.scrollTop = log.scrollHeight;
 }
+
+// ─── Log de tokens consumits per pàgina ──────────────────────────────
+//
+// Imprimeix a la consola informació útil per fer-se una idea del cost real
+// de cada full processat. Útil per comparar la rendibilitat entre models i
+// resolucions (288 DPI vs 216 DPI vs 144 DPI).
+
+// Preus per milió de tokens en USD. Actualitzat maig 2026.
+const PRICING = {
+  'claude-opus-4-7':       { input: 15.00, output: 75.00 },
+  'claude-sonnet-4-6':     { input:  3.00, output: 15.00 },
+  'claude-haiku-4-5':      { input:  1.00, output:  5.00 },
+  'gemini-2.5-pro':        { input:  1.25, output: 10.00 },
+  'gemini-2.5-flash':      { input:  0.30, output:  2.50 },
+  'gemini-2.5-flash-lite': { input:  0.10, output:  0.40 },
+};
+
+function _logPageUsage(pageNum, model, scale, w, h, pixelCount, usage, parsed) {
+  if (!usage) return;
+
+  // Estimació de cost (USD i €). Per a Gemini, els thoughtsTokens es facturen
+  // com a output. Per a Claude, no n'hi ha de visibles.
+  const price = PRICING[model];
+  let costUsd = null;
+  if (price && usage.promptTokens != null && usage.outputTokens != null) {
+    const inCost  = (usage.promptTokens / 1_000_000) * price.input;
+    const outCost = ((usage.outputTokens + (usage.thoughtsTokens || 0)) / 1_000_000) * price.output;
+    costUsd = inCost + outCost;
+  }
+  const costEur = costUsd != null ? costUsd * 0.93 : null;  // taxa USD→EUR aprox.
+
+  // Recompte de respostes detectades
+  const respostes = parsed?.respostes || {};
+  const total = Object.keys(respostes).length;
+  const valides = Object.values(respostes).filter(v => v && v !== '?' && v !== '').length;
+
+  // Fem servir console.group per col·lapsar-lo i no embrutar massa
+  console.groupCollapsed(
+    `[AI cost] Pàg. ${pageNum} — ${model} @ scale ${scale}` +
+    (costEur != null ? ` — ~${costEur.toFixed(4)} €` : '')
+  );
+  console.log(`Imatge enviada: ${w}×${h} px (${(pixelCount / 1_000_000).toFixed(2)} MP)`);
+  console.log(`Tokens entrada (prompt + imatge): ${usage.promptTokens ?? 'n/d'}`);
+  console.log(`Tokens sortida visible: ${usage.outputTokens ?? 'n/d'}`);
+  if (usage.thoughtsTokens != null) {
+    console.log(`Tokens "thinking" (Gemini, també facturat com a output): ${usage.thoughtsTokens}`);
+  }
+  console.log(`Tokens TOTAL: ${usage.totalTokens ?? 'n/d'}`);
+  if (costUsd != null) {
+    console.log(`Cost estimat: $${costUsd.toFixed(5)} ≈ ${costEur.toFixed(5)} €`);
+    console.log(`Per a 60 fulls a aquest ritme: ~${(costEur * 60).toFixed(2)} €`);
+  }
+  console.log(`Respostes detectades: ${valides}/${total}`);
+  console.groupEnd();
+}
+
