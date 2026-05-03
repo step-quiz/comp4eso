@@ -398,7 +398,7 @@ async function _callAnthropic(apiKey, model, base64, prompt) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2000,
+      max_tokens: 4000,  // marge generós; Claude no té thinking ocult al límit
       system: PROMPT_SISTEMA,
       messages: [{
         role: 'user',
@@ -452,7 +452,12 @@ async function _callGemini(apiKey, model, base64, prompt) {
       }],
       generationConfig: {
         responseMimeType: 'application/json',
-        maxOutputTokens: 2000,
+        // 8000 és un límit generós que dóna marge al "thinking" intern de
+        // Gemini 2.5 (que pot consumir 1500-3000 tokens en imatges difícils,
+        // p.ex. resolucions baixes de 144-216 DPI) abans de generar la sortida
+        // visible. Encara que reservem 8000, la factura només cobra els
+        // tokens realment generats.
+        maxOutputTokens: 8000,
         temperature: 0,
       },
     }),
@@ -487,7 +492,11 @@ async function _callGemini(apiKey, model, base64, prompt) {
     throw new Error(`Gemini ha refusat per polítiques de seguretat. Ratings: ${JSON.stringify(candidate.safetyRatings)}`);
   }
   if (fr === 'MAX_TOKENS') {
-    throw new Error('Gemini ha retallat la resposta (MAX_TOKENS). Cal augmentar maxOutputTokens.');
+    throw new Error(
+      'Gemini ha retallat la resposta (MAX_TOKENS). ' +
+      'Si veieu aquest error de manera repetida, proveu a pujar la resolució ' +
+      '(els models pensen menys quan la imatge és més clara) o canvieu a Claude Opus.'
+    );
   }
   if (fr === 'RECITATION') {
     throw new Error('Gemini ha refusat per "RECITATION" (similitud amb material protegit).');
