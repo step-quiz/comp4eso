@@ -761,7 +761,14 @@ es marca (traç tènue, ambigüitat, escaneig borrós, no saps si un cercle envo
 retorna «?». Aquest valor significa "calen ulls humans".
 
 7. RESPOSTA MÚLTIPLE / NO VÀLIDA (escriu «!»): si després d'aplicar les regles 3 i 4 \
-encara queden marques voluntàries en MÉS D'UNA opció, retorna «!».
+encara queden marques voluntàries en MÉS D'UNA opció, retorna «!». \
+Aquest valor és real i s'utilitza: NO el descartis pensant que has de triar guanyador. \
+EXEMPLE A: a una fila V/F, V té una X clara i F també té una X clara (cap dels dos quadrats \
+emplenat) → són DUES marques vàlides → retorna «!». No triïs cap. \
+EXEMPLE B: a una fila a/b/c/d, «a» té una X i «b» està PLE-ENCERCLAT → són dues opcions \
+vàlides (X compta com a vàlida i PLE-ENCERCLAT també) → retorna «!». \
+EXEMPLE C: dues X netes a opcions diferents de la mateixa fila (sense cap quadret PLE per \
+anul·lar-ne una) → retorna «!».
 
 8. ARBRE DE DECISIÓ (segueix aquest ordre exacte):
    PAS A — Per cada quadret, classifica'l com:
@@ -777,6 +784,19 @@ encara queden marques voluntàries en MÉS D'UNA opció, retorna «!».
      · 0 vàlides + alguna ALTRA MARCA poc clara → «?»
      · Exactament 1 vàlida → la opció corresponent
      · 2 o més vàlides → «!»
+   PAS D — VERIFICACIÓ ABANS DE RETORNAR (obligatori, no l'ometis):
+     · Si retornaràs una lletra concreta (a/b/c/d/e/V/F o etiqueta binària): comprova \
+       una segona vegada que la resta de quadrets de la fila són TOTS BUITs o PLE-sense-cercle. \
+       Si en trobes un altre amb X o PLE-ENCERCLAT, RECTIFICA i retorna «!».
+     · Si retornaràs «—»: comprova que la fila NO conté cap X visible ni cap PLE-ENCERCLAT. \
+       Si en detectes un que abans no havies vist, rectifica i retorna aquella opció. Una fila \
+       totalment buida és «—» legítim; una fila amb una sola X és la lletra de la X, mai «—».
+     · Si dubtes entre dues classificacions del mateix quadret (X tènue vs esborrat, PLE vs \
+       PLE-ENCERCLAT amb cercle dèbil, gargot vs aspa) i no pots resoldre-ho amb confiança, \
+       prefereix sempre «?» a triar arbitràriament. Una «?» costa una revisió humana de 5 \
+       segons; una resposta inventada costa una puntuació falsa que ningú no detectarà.
+     · MAI inventis una resposta a una fila que percebis com a buida. Si no veus cap marca, \
+       el valor és «—», no una lletra a l'atzar.
 
 9. FORMAT DE SORTIDA per cada tipus:
    - abcd: minúscula 'a', 'b', 'c' o 'd' (o «—», «?», «!»).
