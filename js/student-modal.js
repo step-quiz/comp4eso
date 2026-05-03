@@ -123,6 +123,11 @@ export function clearAllData() {
 }
 
 export function initStudentModalListeners() {
+  // Click on the overlay backdrop (outside the modal panel) → same as ESC
+  document.getElementById('stu-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('stu-overlay')) closeModal();
+  });
+
   // Modal-level keydown
   document.addEventListener('keydown', e => {
     const stuOpen = !document.getElementById('stu-overlay').classList.contains('off');

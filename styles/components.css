@@ -374,6 +374,23 @@ td.blnk { color: var(--muted); text-align: center; }
   transition: background .14s; text-transform: uppercase;
 }
 .warning-btn-ok:hover { background: #8a5e00; }
+#warning-no-show-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: .75rem;
+  color: #7a6200;
+  cursor: pointer;
+  user-select: none;
+  margin-top: 4px;
+}
+#warning-no-show-label input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #9a6200;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 
 /* ── Centre autocomplete ── */
 .centre-ac {

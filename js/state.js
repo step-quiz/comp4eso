@@ -14,7 +14,7 @@ function _loadCentre() {
     const s = localStorage.getItem('cb4-centre');
     if (s) return JSON.parse(s);
   } catch (_) {}
-  return { centre: 'Institut', curs: getDefaultCurs() };
+  return { centre: 'Institut ', curs: getDefaultCurs() };
 }
 
 function _loadAmbits() {

@@ -52,10 +52,20 @@ export function startApp() {
   applyCompetency(comp);
   document.getElementById('comp-overlay').classList.add('off');
   _pendingAfterWarning = key;
-  document.getElementById('warning-overlay').classList.remove('off');
+  // Skip warning if user previously opted out
+  if (localStorage.getItem('cb4-hide-warning') === '1') {
+    acceptWarning();
+  } else {
+    document.getElementById('warning-overlay').classList.remove('off');
+  }
 }
 
 export function acceptWarning() {
+  // Persist "don't show again" preference
+  const chk = document.getElementById('warning-no-show-chk');
+  if (chk && chk.checked) {
+    localStorage.setItem('cb4-hide-warning', '1');
+  }
   document.getElementById('warning-overlay').classList.add('off');
   const key = _pendingAfterWarning;
   _pendingAfterWarning = null;
@@ -80,7 +90,8 @@ setAfterKeyEditorFn(afterKeyEditor);
 
 export function initStartupPrefill() {
   const cfg = getCentreCfg();
-  document.getElementById('sw-centre').value =
-    cfg.centre !== 'Institut' ? cfg.centre : '';
+  // Always pre-fill with the stored value; default is 'Institut ' (with trailing
+  // space) so the user can append their specific institute name directly.
+  document.getElementById('sw-centre').value = cfg.centre;
   document.getElementById('sw-curs').value = cfg.curs;
 }
