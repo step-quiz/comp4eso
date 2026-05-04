@@ -27,6 +27,7 @@ import {
   markSaved,
   getCurrentCompetencyId,
   getAmbits,
+  setAiLog,
 } from './state.js';
 import { getQ, render } from './render.js';
 import { hideCompletePrompt } from './student-modal.js';
@@ -231,7 +232,8 @@ export async function processAiPdf(input) {
     _setStatus(`Carregant ${total} pàgina(es) (model: ${model})...`);
     _showLog();
 
-    const results = [];
+    const results   = [];
+    const logEntries = [];
 
     for (let p = 1; p <= total; p++) {
       _setStatus(`Processant pàgina ${p} de ${total}...`);
@@ -242,8 +244,8 @@ export async function processAiPdf(input) {
         results.push(result);
 
         if (result._failed) {
-          // Tots els reintents han fallat. La pàgina queda buida amb el missatge
-          // d'error per propagar-lo al toast final.
+          logEntries.push({ page: p, name: '', valid: 0, total: Q,
+            comment: '', failed: true, error: result._error || 'Error desconegut' });
           _appendLog(
             `Pàg. ${p} — <strong>ERROR D'API</strong> — ${_esc(result._error)}`,
             'err'
@@ -251,6 +253,8 @@ export async function processAiPdf(input) {
         } else {
           const valides = Object.values(result.respostes)
             .filter(v => v && v !== '?' && v !== '').length;
+          logEntries.push({ page: p, name: result.id_alumne || '', valid: valides, total: Q,
+            comment: result.comentari || '', failed: false, error: '' });
           _appendLog(
             `Pàg. ${p} — <strong>${_esc(result.id_alumne || '(sense nom)')}</strong>` +
             ` — ${valides}/${Q} respostes` +
@@ -259,6 +263,8 @@ export async function processAiPdf(input) {
           );
         }
       } catch (err) {
+        logEntries.push({ page: p, name: '', valid: 0, total: Q,
+          comment: '', failed: true, error: err.message });
         _appendLog(`Pàg. ${p} — Error: ${_esc(err.message)}`, 'err');
         console.error(`Page ${p}:`, err);
       }
@@ -274,7 +280,7 @@ export async function processAiPdf(input) {
     }
 
     _setStatus(`${results.length} alumne(s) processats. Carregant dades...`);
-    _loadResultsIntoApp(results, competency, items);
+    _loadResultsIntoApp(results, competency, items, model, logEntries);
 
   } catch (err) {
     _setStatus(`Error carregant el PDF: ${err.message}`);
@@ -636,7 +642,7 @@ function normalitzarResposta(raw, item) {
 
 // ─── Carregar resultats a l'estat de l'app ───────────────────────────
 
-function _loadResultsIntoApp(results, competency, items) {
+function _loadResultsIntoApp(results, competency, items, model, logEntries) {
   const Q = items.length;
   const existing = getStuOrder();
   if (existing.length > 0) {
@@ -670,6 +676,10 @@ function _loadResultsIntoApp(results, competency, items) {
   hideCompletePrompt();
   render();
   markSaved();
+
+  // Desar el log estructurat a l'estat perquè export.js el pugui incloure
+  // com a full addicional "Log OMR" quan l'usuari exporti el XLSX.
+  setAiLog({ model, runAt: new Date().toISOString(), entries: logEntries });
 
   closeAiRecognizer();
 

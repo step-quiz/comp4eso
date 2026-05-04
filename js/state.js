@@ -56,6 +56,11 @@ let _pdfRenderTask = null;
 let _pdfResizeTimer = null;
 let _pdfZoom = 1.0;
 
+// Log estructurat del darrer reconeixement OMR (transient, no persistit).
+// null = no s'ha fet cap reconeixement en aquesta sessió.
+// { model, runAt, entries: [{page,name,valid,total,comment,failed,error}] }
+let _aiLog = null;
+
 // ── Getters ──
 export const getStuMap              = () => _stuMap;
 export const getStuNames            = () => _stuNames;
@@ -75,6 +80,7 @@ export const getPdfCurrentPage      = () => _pdfCurrentPage;
 export const getPdfRenderTask       = () => _pdfRenderTask;
 export const getPdfResizeTimer      = () => _pdfResizeTimer;
 export const getPdfZoom             = () => _pdfZoom;
+export const getAiLog               = () => _aiLog;
 
 // ── Setters ──
 export const setStuMap              = v => { _stuMap = v; };
@@ -93,6 +99,7 @@ export const setPdfCurrentPage      = v => { _pdfCurrentPage = v; };
 export const setPdfRenderTask       = v => { _pdfRenderTask = v; };
 export const setPdfResizeTimer      = v => { _pdfResizeTimer = v; };
 export const setPdfZoom             = v => { _pdfZoom = v; };
+export const setAiLog               = v => { _aiLog = v; };
 
 export function markUnsaved() { _unsavedChanges = true; }
 export function markSaved()   { _unsavedChanges = false; }

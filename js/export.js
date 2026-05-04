@@ -13,6 +13,7 @@ import {
   setCurIdx, setQIdx,
   getAnswerKey, setAnswerKey,
   getLastResults,
+  getAiLog,
   markSaved,
 } from './state.js';
 import { getQ, getAmbitRanges, getItemLabel, getItemType, getAmbitForQ, valDisplay, render } from './render.js';
@@ -111,13 +112,100 @@ export async function exportRespostes() {
   });
 
   const buf  = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  _maybeAddOmrLogSheet(wb);
+  const buf2 = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf2], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url; a.download = currentCompetencyId + '_respostes_cb4eso.xlsx'; a.click();
   URL.revokeObjectURL(url);
   markSaved();
 }
+
+// ─── Full addicional "Log OMR" ────────────────────────────────────────
+//
+// Si en aquesta sessió s'ha fet un reconeixement automàtic (aiLog != null),
+// s'afegeix un full "Log OMR" al workbook amb el resum de cada pàgina:
+// model usat, data/hora, nom detectat, respostes vàlides i comentaris de la IA.
+
+function _maybeAddOmrLogSheet(wb) {
+  const aiLog = getAiLog();
+  if (!aiLog) return;
+
+  const ws = wb.addWorksheet('Log OMR');
+  ws.columns = [
+    { width: 8  },   // Pàgina
+    { width: 24 },   // Nom
+    { width: 14 },   // Respostes
+    { width: 52 },   // Comentari IA
+    { width: 10 },   // Estat
+  ];
+
+  // ── Capçalera del full ──
+  const runDate = new Date(aiLog.runAt);
+  const dateStr = runDate.toLocaleDateString('ca-ES', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  ws.mergeCells('A1:E1');
+  const titleCell = ws.getCell('A1');
+  titleCell.value     = 'Log de reconeixement automàtic OMR';
+  titleCell.font      = { bold: true, size: 11, color: { argb: 'FF1A4F8A' } };
+  titleCell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EEF5' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 20;
+
+  ws.mergeCells('A2:E2');
+  const metaCell = ws.getCell('A2');
+  metaCell.value     = `Model: ${aiLog.model}   ·   Data: ${dateStr}   ·   ${aiLog.entries.length} full(s) processats`;
+  metaCell.font      = { italic: true, size: 9, color: { argb: 'FF555555' } };
+  metaCell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F7FA' } };
+  metaCell.alignment = { horizontal: 'center' };
+  ws.getRow(2).height = 14;
+
+  // ── Fila de capçaleres de columna ──
+  const HDR_ARGB = 'FF1A4F8A';
+  const hdrRow = ws.addRow(['Pàgina', 'Nom detectat', 'Respostes vàl.', 'Comentari de la IA', 'Estat']);
+  hdrRow.height = 15;
+  hdrRow.eachCell(cell => {
+    cell.font      = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: HDR_ARGB } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+  hdrRow.getCell(2).alignment = { horizontal: 'left' };
+  hdrRow.getCell(4).alignment = { horizontal: 'left' };
+
+  // ── Files de dades ──
+  const WHITE = 'FFFFFFFF', GREY = 'FFF4F4F4';
+  aiLog.entries.forEach((e, i) => {
+    const bg      = i % 2 === 0 ? WHITE : GREY;
+    const estat   = e.failed ? '⚠ Error' : (e.valid === e.total ? '✓ OK' : `✓ ${e.valid}/${e.total}`);
+    const row     = ws.addRow([
+      e.page,
+      e.failed ? '(error d\'API)' : (e.name || '(sense nom)'),
+      e.failed ? '—' : `${e.valid} / ${e.total}`,
+      e.failed ? e.error : (e.comment || ''),
+      estat,
+    ]);
+    row.height = 13;
+    row.eachCell({ includeEmpty: true }, (cell, colNum) => {
+      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.font      = { size: 9 };
+      cell.alignment = { horizontal: colNum === 1 || colNum === 3 || colNum === 5
+        ? 'center' : 'left', vertical: 'middle' };
+    });
+    // Color de la columna Estat
+    const estatCell = row.getCell(5);
+    if (e.failed) {
+      estatCell.font = { bold: true, size: 9, color: { argb: 'FFCC4444' } };
+    } else {
+      estatCell.font = { size: 9, color: { argb: 'FF27AE60' } };
+    }
+  });
+}
+
+// ─── Importació de respostes ──────────────────────────────────────────
 
 export async function importRespostes(input) {
   const file = input.files[0];
