@@ -18,7 +18,7 @@ import { buildGrid } from './grid.js';
 import { render } from './render.js';
 import {
   initPdfWorker, initPdfResizeListener, setOpenModalFn,
-  togglePdfPane, loadPdfFile, changePdfZoom,
+  togglePdfPane, loadPdfFile, changePdfZoom, setPdfLayout,
 } from './pdf-viewer.js';
 import {
   openModal, confirmStudent, clearAllData, editNameInline,
@@ -107,6 +107,8 @@ on('dd-export-xlsx', 'click', () => { closeDropdowns(); exportRespostes(); });
 on('btn-correct',    'click', () => { closeDropdowns(); openCorrect(); });
 on('dd-key-editor',  'click', () => { closeDropdowns(); openKeyEditor(); });
 on('btn-pdf-toggle', 'click', () => { closeDropdowns(); togglePdfPane(); });
+on('btn-pdf-layout-compact', 'click', () => { closeDropdowns(); setPdfLayout('compact'); });
+on('btn-pdf-layout-split',   'click', () => { closeDropdowns(); setPdfLayout('split');   });
 on('dd-clear-data',  'click', () => { closeDropdowns(); clearAllData(); });
 
 // Dropdown items — Configuració

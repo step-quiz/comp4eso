@@ -16,6 +16,51 @@ import {
 
 const pdfjsLib = window.pdfjsLib;
 
+// ── PDF layout mode ('compact' | 'split') ──
+// Persisted in localStorage so the user's choice is remembered across sessions.
+const PDF_LAYOUT_KEY     = 'cb4-pdf-layout';
+const PDF_LAYOUT_DEFAULT = 'compact';
+
+function _loadPdfLayout() {
+  try {
+    const v = localStorage.getItem(PDF_LAYOUT_KEY);
+    if (v === 'compact' || v === 'split') return v;
+  } catch (_) {}
+  return PDF_LAYOUT_DEFAULT;
+}
+
+let _pdfLayout = _loadPdfLayout();
+
+function _applyPdfLayoutClass() {
+  // Mutually exclusive body classes; only effective when has-pdf is also set.
+  document.body.classList.toggle('pdf-layout-compact', _pdfLayout === 'compact');
+  document.body.classList.toggle('pdf-layout-split',   _pdfLayout === 'split');
+  // Reflect active state on dropdown items.
+  const optC = document.getElementById('btn-pdf-layout-compact');
+  const optS = document.getElementById('btn-pdf-layout-split');
+  if (optC) optC.classList.toggle('active', _pdfLayout === 'compact');
+  if (optS) optS.classList.toggle('active', _pdfLayout === 'split');
+  // Show/hide the layout sub-options depending on whether the PDF pane is on.
+  const onPdf = document.body.classList.contains('has-pdf');
+  if (optC) optC.style.display = onPdf ? '' : 'none';
+  if (optS) optS.style.display = onPdf ? '' : 'none';
+}
+
+export function getPdfLayout() { return _pdfLayout; }
+
+export function setPdfLayout(mode) {
+  if (mode !== 'compact' && mode !== 'split') return;
+  _pdfLayout = mode;
+  try { localStorage.setItem(PDF_LAYOUT_KEY, mode); } catch (_) {}
+  _applyPdfLayoutClass();
+  // The available PDF width changes between modes — re-render so the canvas
+  // resizes to fill its new container width crisply.
+  if (getPdfDoc() && getPdfCurrentPage() >= 1) {
+    // Defer one frame so the layout re-flow has settled before measuring.
+    requestAnimationFrame(() => renderPdfPage(getPdfCurrentPage()));
+  }
+}
+
 export function initPdfWorker() {
   if (pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -29,6 +74,8 @@ export function updatePdfToggleBtn() {
   btn.textContent = hasPane
     ? '🔍  Desactivar el visualitzador PDF'
     : '🔍  Activar el visualitzador PDF';
+  // Layout sub-options are only meaningful when the PDF pane is on.
+  _applyPdfLayoutClass();
 }
 
 // Forward-declared by setter: openModal lives in student-modal.js.
