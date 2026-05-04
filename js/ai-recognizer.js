@@ -71,7 +71,8 @@ function _modelInfo(id) {
 // Escales possibles per al renderitzat de PDF. ≈DPI = scale × 72.
 // 4.0 (288 DPI) és el default segons les nostres proves: detecta cercles fins
 // i marques tènues amb molta més fiabilitat que resolucions inferiors.
-// El cost extra és menyspreable (les imatges es limiten a 1800px de costat).
+// El cost extra és menyspreable (les imatges es limiten a 1800px per defecte;
+// en fulls complexos amb moltes correccions el cap puja a 2200px automàticament).
 const SCALE_CHOICES = [
   { val: '4.0', label: '≈288 DPI (màxima qualitat, recomanat)' },
   { val: '3.0', label: '≈216 DPI (equilibri qualitat/cost)' },
@@ -287,6 +288,9 @@ export async function processAiPdf(input) {
 // ─── Processar una pàgina ─────────────────────────────────────────────
 
 async function _processPage(pdfDoc, pageNum, apiKey, competency, items, model, scale) {
+  // Renderitzem el canvas a alta resolució UNA SOLA VEGADA (operació cara).
+  // El downscale i la codificació base64 es fan dins del bucle perquè poden
+  // canviar si detectem un full complex (escalada de maxImageDim).
   const page     = await pdfDoc.getPage(pageNum);
   const viewport = page.getViewport({ scale });
   const canvas   = document.createElement('canvas');
@@ -294,23 +298,30 @@ async function _processPage(pdfDoc, pageNum, apiKey, competency, items, model, s
   canvas.height  = Math.round(viewport.height);
   await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
 
-  // Redimensionar si supera 1800px (estalvia tokens sense perdre qualitat OCR)
-  let src = canvas;
-  const maxDim = 1800;
-  if (Math.max(canvas.width, canvas.height) > maxDim) {
-    const ratio = maxDim / Math.max(canvas.width, canvas.height);
-    src = document.createElement('canvas');
-    src.width  = Math.round(canvas.width  * ratio);
-    src.height = Math.round(canvas.height * ratio);
-    src.getContext('2d').drawImage(canvas, 0, 0, src.width, src.height);
-  }
-
-  const base64 = src.toDataURL('image/jpeg', 0.85).split(',')[1];
-  const prompt = buildOmrPrompt(competency);
+  const prompt   = buildOmrPrompt(competency);
   const provider = _modelInfo(model).provider;
 
-  // Mida de la imatge enviada (per al log de cost)
-  const pixelCount = src.width * src.height;
+  // Paràmetres adaptatius: valors inicials conservadors (cost baix).
+  // Si Gemini detecta un full complex (MAX_TOKENS), els escalem tots dos
+  // alhora per al proper intent i només per a aquest full.
+  let maxImageDim      = 1800;
+  let maxOutputTokens  = 8000;
+
+  // Funció auxiliar: downscale del canvas original al límit actual i
+  // codificació JPEG. Es crida cada cop que maxImageDim pugui haver canviat.
+  function _buildBase64() {
+    let src = canvas;
+    if (Math.max(canvas.width, canvas.height) > maxImageDim) {
+      const ratio = maxImageDim / Math.max(canvas.width, canvas.height);
+      src = document.createElement('canvas');
+      src.width  = Math.round(canvas.width  * ratio);
+      src.height = Math.round(canvas.height * ratio);
+      src.getContext('2d').drawImage(canvas, 0, 0, src.width, src.height);
+    }
+    return { base64: src.toDataURL('image/jpeg', 0.85).split(',')[1], src };
+  }
+
+  let { base64, src } = _buildBase64();
 
   let lastErr = null;
   let attempt = 0;
@@ -318,7 +329,7 @@ async function _processPage(pdfDoc, pageNum, apiKey, competency, items, model, s
     attempt++;
     try {
       const callResult = (provider === 'google')
-        ? await _callGemini(apiKey, model, base64, prompt)
+        ? await _callGemini(apiKey, model, base64, prompt, maxOutputTokens)
         : await _callAnthropic(apiKey, model, base64, prompt);
 
       const text = callResult.text;
@@ -332,12 +343,30 @@ async function _processPage(pdfDoc, pageNum, apiKey, competency, items, model, s
       const parsed = _validarResposta(JSON.parse(clean), items);
 
       // Log informatiu d'ús (a la consola). No bloquejant si falten dades.
-      _logPageUsage(pageNum, model, scale, src.width, src.height, pixelCount, usage, parsed);
+      _logPageUsage(pageNum, model, scale, src.width, src.height, src.width * src.height, usage, parsed);
 
       return parsed;
 
     } catch (err) {
       lastErr = err;
+
+      // Full complex detectat (thinking exhaureix el pressupost de tokens):
+      // escalem ALHORA els tokens i la mida de la imatge, i reintentes sense
+      // consumir un intent "de debò". La imatge més gran redueix l'ambigüitat
+      // visual → el model pensa menys → l'escalada de tokens és suficient.
+      // Ho fem només una vegada; si amb 16.000 encara retalla, cas extrem.
+      if (err.isMaxTokens && maxOutputTokens < 16000) {
+        maxOutputTokens = 16000;
+        maxImageDim     = 2200;
+        ({ base64, src } = _buildBase64());   // regenerar amb nova mida
+        console.warn(
+          `[AI] Pàg. ${pageNum}: MAX_TOKENS. Reintentant amb ${maxOutputTokens} tokens` +
+          ` i imatge ${src.width}×${src.height} px (cap ${maxImageDim}px)...`
+        );
+        // No comptem aquest intent com a "fallada" a efectes de maxAttempts.
+        attempt--;
+        continue;
+      }
 
       // Decideix si val la pena reintentar i quan
       const isTransient = _isTransientError(err);
@@ -453,7 +482,7 @@ async function _callAnthropic(apiKey, model, base64, prompt) {
 // El system prompt es passa com a `systemInstruction.parts[0].text`.
 // El text + imatge van junts a `contents[0].parts[]`.
 
-async function _callGemini(apiKey, model, base64, prompt) {
+async function _callGemini(apiKey, model, base64, prompt, maxOutputTokens = 8000) {
   const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const resp = await fetch(url, {
@@ -472,12 +501,7 @@ async function _callGemini(apiKey, model, base64, prompt) {
       }],
       generationConfig: {
         responseMimeType: 'application/json',
-        // 8000 és un límit generós que dóna marge al "thinking" intern de
-        // Gemini 2.5 (que pot consumir 1500-3000 tokens en imatges difícils,
-        // p.ex. resolucions baixes de 144-216 DPI) abans de generar la sortida
-        // visible. Encara que reservem 8000, la factura només cobra els
-        // tokens realment generats.
-        maxOutputTokens: 8000,
+        maxOutputTokens,
         temperature: 0,
       },
     }),
@@ -512,11 +536,13 @@ async function _callGemini(apiKey, model, base64, prompt) {
     throw new Error(`Gemini ha refusat per polítiques de seguretat. Ratings: ${JSON.stringify(candidate.safetyRatings)}`);
   }
   if (fr === 'MAX_TOKENS') {
-    throw new Error(
+    const err = new Error(
       'Gemini ha retallat la resposta (MAX_TOKENS). ' +
       'Si veieu aquest error de manera repetida, proveu a pujar la resolució ' +
       '(els models pensen menys quan la imatge és més clara) o canvieu a Claude Opus.'
     );
+    err.isMaxTokens = true;
+    throw err;
   }
   if (fr === 'RECITATION') {
     throw new Error('Gemini ha refusat per "RECITATION" (similitud amb material protegit).');
