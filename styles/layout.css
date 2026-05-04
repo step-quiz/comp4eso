@@ -36,34 +36,6 @@
   flex: 1 1 50%; min-height: 0; min-width: 0;
 }
 body:not(.has-pdf) .grid-wrapper { flex: 1; }
-
-/* ── PDF mode: compact grid snaps tight to the PDF pane ── */
-body.has-pdf .grid-wrapper {
-  flex: 0 0 192px;
-  min-width: 0;
-  max-width: 192px;
-}
-body.has-pdf .pdf-pane {
-  flex: 1;
-}
-body.has-pdf .ambit-bar {
-  font-size: .55rem;
-  padding: 3px 4px;
-}
-body.has-pdf .sect-hdr {
-  font-size: .5rem;
-  padding: 2px 4px;
-}
-body.has-pdf .col-lbl-range {
-  font-size: .44rem;
-  padding: 0 2px 1px;
-}
-body.has-pdf .sect-grid {
-  gap: 3px;
-}
-body.has-pdf .grid {
-  gap: 3px;
-}
 .ambit-bar {
   font-size: .65rem; font-weight: 700; text-align: center;
   text-transform: uppercase; letter-spacing: .1em; color: #fff;

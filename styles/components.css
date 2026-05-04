@@ -115,22 +115,7 @@
   z-index: 300; backdrop-filter: blur(2px);
 }
 .overlay.off { display: none; }
-body.has-pdf #stu-overlay { right: calc(100% - 192px); }
-
-/* ── PDF mode: compact cells ── */
-body.has-pdf .cell {
-  padding: 0 3px;
-  gap: 3px;
-  border-radius: 3px;
-}
-body.has-pdf .q-n {
-  font-size: .52rem;
-  width: 12px;
-}
-body.has-pdf .q-a {
-  font-size: .68rem;
-  width: 10px;
-}
+body.has-pdf #stu-overlay { right: 50%; }
 
 /* ── Student modal ── */
 .modal {
