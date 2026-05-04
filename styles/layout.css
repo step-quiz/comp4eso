@@ -103,3 +103,56 @@ kbd  { background: var(--panel); border: 1px solid var(--border); border-bottom:
 .grid-narrow {
   max-width: 460px; width: 100%; margin: 0 auto;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PDF layout modes — "Compact" (Option 1) and "Split" (Option 2).
+   Only apply when PDF is active (body.has-pdf). Defaults to compact.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Compact mode (Option 1) ──
+   Activity columns stay together on the left 50%, but are narrowed and
+   right-aligned (top-right indent) so they sit close to the PDF.    */
+body.has-pdf.pdf-layout-compact .grid-wrapper {
+  align-items: flex-end;        /* right-align the inner grid */
+}
+body.has-pdf.pdf-layout-compact .grid.grid-narrow {
+  max-width: 320px;             /* narrower than default 460px */
+  width: 100%;
+  margin: 0;                    /* override `margin: 0 auto` from .grid-narrow */
+  margin-left: auto;            /* push to right edge (close to PDF) */
+}
+
+/* ── Split mode (Option 2) ──
+   Use a 3-column grid on .main: col1 (act 1+2) | PDF | col2 (act 3+4).
+   .grid-wrapper and .grid use display:contents so their children flow
+   directly into .main's grid layout.                                  */
+body.has-pdf.pdf-layout-split .main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  grid-auto-flow: dense;        /* let pdf-pane (DOM-order 3rd) backfill column 2 */
+  gap: 5px;
+  align-items: stretch;
+}
+body.has-pdf.pdf-layout-split .grid-wrapper {
+  display: contents;
+}
+body.has-pdf.pdf-layout-split .grid {
+  display: contents !important; /* override inline display:grid from grid.js */
+}
+body.has-pdf.pdf-layout-split .main > .grid-wrapper > .grid > .mat-col:first-of-type {
+  grid-column: 1;
+  max-width: 220px;
+  width: 100%;
+  margin-left: auto;            /* indent top-right (close to PDF) */
+  min-height: 0;
+}
+body.has-pdf.pdf-layout-split .pdf-pane {
+  grid-column: 2;
+}
+body.has-pdf.pdf-layout-split .main > .grid-wrapper > .grid > .mat-col:last-of-type {
+  grid-column: 3;
+  max-width: 220px;
+  width: 100%;
+  margin-right: auto;           /* indent top-left (close to PDF) */
+  min-height: 0;
+}

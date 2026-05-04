@@ -45,6 +45,28 @@
 .dd-item.danger:hover:not(:disabled) { background: #fff0f0; color: #cc3333; }
 .dd-item:disabled { opacity: .38; cursor: not-allowed; }
 .dd-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* PDF layout option items: active state indicator */
+.dd-item.pdf-layout-opt {
+  padding-left: 32px;          /* extra indent so they read as sub-options of the toggle above */
+  font-size: .68rem;
+  color: var(--muted);
+  position: relative;
+}
+.dd-item.pdf-layout-opt::before {
+  content: '';
+  position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+  width: 8px; height: 8px; border-radius: 50%;
+  background: transparent; border: 1.5px solid var(--border);
+  transition: background .12s, border-color .12s;
+}
+.dd-item.pdf-layout-opt.active {
+  color: var(--accent); background: var(--f-bg);
+}
+.dd-item.pdf-layout-opt.active::before {
+  background: var(--accent); border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px #fff;
+}
 .key-loaded {
   font-size: .6rem; padding: 3px 10px; border-radius: 10px;
   background: #e8f4e8; border: 1px solid #80c080; color: #2a6030;
