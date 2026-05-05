@@ -535,7 +535,7 @@ export async function generateInformes() {
               bold: false, size: 20, fill: 'E87722', color: 'FFFFFF', before: 0, after: 0 }),
 
       // A2+A3: destinatari i codi de centre
-      wPara({ text: `Informe per a la fam\u00edlia de l\u2019alumne/a: ${r.name}`,
+      wPara({ text: `Informe per a la fam\u00edlia`,
               size: 20, color: 'FFFFFF', fill: 'E87722', before: 0, after: 120 }),
 
       // B4: text introductori
@@ -587,7 +587,7 @@ export async function generateInformes() {
               bold: true, size: 38, fill: 'E87722', color: 'FFFFFF', before: 100, after: 0 }),
       wPara({ text: `4t d’ESO  ·  ${centreCfg.centre}`,
               bold: false, size: 20, fill: 'E87722', color: 'FFFFFF', before: 0, after: 0 }),
-      wPara({ text: `Informe per a la fam\u00edlia de l\u2019alumne/a: ${r.name}`,
+      wPara({ text: `Informe per a la fam\u00edlia`,
               size: 20, color: 'FFFFFF', fill: 'E87722', before: 0, after: 120 }),
       wPara({ text: 'Benvolguda fam\u00edlia,', bold: true, size: 22, color: '111111', before: 280, after: 80 }),
       wPara({ text: 'Els presentem els resultats que el seu fill/a ha obtingut de les proves de compet\u00e8ncia b\u00e0sica de 4t d\u2019ESO. Aquests resultats s\u2019incorporaran al conjunt d\u2019informaci\u00f3 de l\u2019alumne/a i es tindran en compte en l\u2019avaluaci\u00f3 final, tot i que no seran determinants per a l\u2019obtenci\u00f3 del t\u00edtol de graduat en educaci\u00f3 secund\u00e0ria obligat\u00f2ria.',
@@ -689,7 +689,7 @@ export async function generateInformes() {
               bold: true, size: 38, fill: 'E87722', color: 'FFFFFF', before: 100, after: 0 }),
       wPara({ text: `4t d\u2019ESO  \u00b7  ${centreCfg.centre}`,
               bold: false, size: 20, fill: 'E87722', color: 'FFFFFF', before: 0, after: 0 }),
-      wPara({ text: `Informe per a la fam\u00edlia de l\u2019alumne/a: ${r.name}`,
+      wPara({ text: `Informe per a la fam\u00edlia`,
               size: 20, color: 'FFFFFF', fill: 'E87722', before: 0, after: 120 }),
       wPara({ text: 'Benvolguda fam\u00edlia,', bold: true, size: 22, color: '111111', before: 280, after: 80 }),
       wPara({ text: 'Els presentem els resultats que el seu fill/a ha obtingut de les proves de compet\u00e8ncia b\u00e0sica de 4t d\u2019ESO. Aquests resultats s\u2019incorporaran al conjunt d\u2019informaci\u00f3 de l\u2019alumne/a i es tindran en compte en l\u2019avaluaci\u00f3 final, tot i que no seran determinants per a l\u2019obtenci\u00f3 del t\u00edtol de graduat en educaci\u00f3 secund\u00e0ria obligat\u00f2ria.',
