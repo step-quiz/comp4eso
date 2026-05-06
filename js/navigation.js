@@ -5,6 +5,7 @@
 import {
   getCurIdx, setCurIdx, getQIdx, setQIdx,
   getStuMap, getStuOrder, markUnsaved,
+  clearStudentFlag,
 } from './state.js';
 import { getQ, getAmbitRanges, render } from './render.js';
 import { syncPdfToCurrent } from './pdf-viewer.js';
@@ -84,6 +85,7 @@ export function goBack() {
     qIdx--;
     setQIdx(qIdx);
     stuMap[stuOrder[curIdx]][qIdx] = null;
+    clearStudentFlag(stuOrder[curIdx], qIdx);  // l'usuari ha tocat la cel·la
     markUnsaved();
   } else if (curIdx > 0) {
     const newCur = curIdx - 1;
@@ -91,6 +93,7 @@ export function goBack() {
     qIdx = Q - 1;
     setQIdx(qIdx);
     stuMap[stuOrder[newCur]][qIdx] = null;
+    clearStudentFlag(stuOrder[newCur], qIdx);
     markUnsaved();
   }
   render();

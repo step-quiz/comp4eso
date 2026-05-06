@@ -35,6 +35,15 @@ export function getDefaultCurs() {
 
 // ── Module-private state ──
 let _stuMap            = {};        // key → answers[]
+// Flags d'incertesa de la IA, en paral·lel a _stuMap. Cada array té la mateixa
+// longitud que el de respostes, amb un d'aquests valors per posició:
+//   null  → cap flag (ítem fàcil, o l'usuari ja ha revisat manualment)
+//   1     → "tricky": la IA ha resolt el cas però hi havia ambigüitat estructural
+//           (anul·lacions, reanul·lacions, marques múltiples interpretades amb regles)
+//   2     → "doubt":  la IA dubta de la lectura (marca tènue, ambigüitat no resolta)
+// Es poblen quan es carreguen els resultats del reconeixement automàtic, i
+// s'esborren a mida que l'usuari edita una cel·la flagejada.
+let _stuFlags          = {};        // key → flags[]  (null | 1 | 2)
 let _stuNames          = {};        // key → display name
 let _stuOrder          = [];        // string[] — insertion order
 let _curIdx            = -1;
@@ -63,6 +72,7 @@ let _aiLog = null;
 
 // ── Getters ──
 export const getStuMap              = () => _stuMap;
+export const getStuFlags            = () => _stuFlags;
 export const getStuNames            = () => _stuNames;
 export const getStuOrder            = () => _stuOrder;
 export const getCurIdx              = () => _curIdx;
@@ -84,6 +94,7 @@ export const getAiLog               = () => _aiLog;
 
 // ── Setters ──
 export const setStuMap              = v => { _stuMap = v; };
+export const setStuFlags            = v => { _stuFlags = v; };
 export const setStuNames            = v => { _stuNames = v; };
 export const setStuOrder            = v => { _stuOrder = v; };
 export const setCurIdx              = v => { _curIdx = v; };
@@ -111,6 +122,16 @@ export function markSaved()   { _unsavedChanges = false; }
 // declared at the top of this file.
 export function setStudentAnswer(key, qIdx, value) {
   _stuMap[key][qIdx] = value;
+}
+
+// ── Granular setter / clearer for individual flags ──
+// L'usuari ha editat la cel·la → la flag de la IA deixa de ser rellevant.
+// clearStudentFlag és un alias semàntic per a setStudentFlag(..., null).
+export function setStudentFlag(key, qIdx, value) {
+  if (_stuFlags[key]) _stuFlags[key][qIdx] = value;
+}
+export function clearStudentFlag(key, qIdx) {
+  if (_stuFlags[key]) _stuFlags[key][qIdx] = null;
 }
 
 // ── Persisted state setters ──

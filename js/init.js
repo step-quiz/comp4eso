@@ -15,7 +15,8 @@
 
 import { loadKeyCfg, initSettingsKeyHandler, openSettings, saveCfgSettings, resetKeys } from './keyboard.js';
 import { buildGrid } from './grid.js';
-import { render } from './render.js';
+import { render, findNextFlaggedQ, getQ } from './render.js';
+import { getCurIdx, getQIdx, setQIdx } from './state.js';
 import {
   initPdfWorker, initPdfResizeListener, setOpenModalFn,
   togglePdfPane, loadPdfFile, changePdfZoom, setPdfLayout,
@@ -94,6 +95,14 @@ on('btn-prev-stu',  'click', prevStu);
 on('btn-next-stu',  'click', nextStu);
 on('btn-empty-cta', 'click', openModal);
 on('hdr-name',      'click', editNameInline);
+on('btn-next-flag', 'click', () => {
+  // Mateix comportament que la drecera Tab: salta a la propera flag.
+  if (getCurIdx() < 0) return;
+  const Q = getQ();
+  const cur = Math.min(getQIdx(), Q - 1);
+  const target = findNextFlaggedQ(cur, +1);
+  if (target >= 0) { setQIdx(target); render(); }
+});
 
 // Dropdown triggers
 on('dd-accions-trigger', 'click', () => toggleDropdown('dd-accions'));

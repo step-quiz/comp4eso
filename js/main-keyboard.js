@@ -9,11 +9,11 @@
 
 import {
   getCurIdx, getQIdx, setQIdx,
-  getStuOrder, setStudentAnswer,
+  getStuOrder, setStudentAnswer, setStudentFlag,
   isStuCompletePrompt,
   markUnsaved,
 } from './state.js';
-import { getQ, getItemType, render } from './render.js';
+import { getQ, getItemType, render, findNextFlaggedQ } from './render.js';
 import { getKeyCfg, normalizeKey } from './keyboard.js';
 import { isKeyEditorOpen } from './key-editor.js';
 import {
@@ -52,6 +52,21 @@ export function initMainKeyboard() {
     if (e.key === 'ArrowLeft')  { e.preventDefault(); moveCell('left');  return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); moveCell('right'); return; }
 
+    // Tab / Shift+Tab: salta a la pregunta flagejada següent / anterior
+    // de l'alumne actual. Només té efecte si hi ha cap flag pendent.
+    if (e.key === 'Tab') {
+      const dir = e.shiftKey ? -1 : 1;
+      const Q = getQ();
+      const cur = Math.min(getQIdx(), Q - 1);
+      const target = findNextFlaggedQ(cur, dir);
+      if (target >= 0) {
+        e.preventDefault();
+        setQIdx(target);
+        render();
+      }
+      return;
+    }
+
     const keyCfg = getKeyCfg();
     const lk = normalizeKey(e);
     if (lk === keyCfg.erase) { e.preventDefault(); goBack(); return; }
@@ -70,6 +85,9 @@ export function initMainKeyboard() {
       e.preventDefault();
       const stuOrder = getStuOrder();
       setStudentAnswer(stuOrder[curIdx], qIdx, val);
+      // L'usuari ha confirmat un valor: la flag d'incertesa de la IA ja
+      // no és rellevant — l'humà ja ha revisat aquesta cel·la.
+      setStudentFlag(stuOrder[curIdx], qIdx, null);
       markUnsaved();
       if (qIdx < Q - 1) {
         setQIdx(qIdx + 1);

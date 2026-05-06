@@ -8,7 +8,7 @@
 import { COMPETENCIES } from '../data/competencies.js';
 import {
   getCurrentCompetencyId,
-  getStuMap, setStuMap, getStuNames, setStuNames, getStuOrder, setStuOrder,
+  getStuMap, setStuMap, setStuFlags, getStuNames, setStuNames, getStuOrder, setStuOrder,
   getCentreCfg, setCentreCfg,
   setCurIdx, setQIdx,
   getAnswerKey, setAnswerKey,
@@ -137,6 +137,8 @@ function _maybeAddOmrLogSheet(wb) {
     { width: 8  },   // Pàgina
     { width: 24 },   // Nom
     { width: 14 },   // Respostes
+    { width: 8  },   // Polèmiques (tricky, d=1)
+    { width: 8  },   // Dubtes (doubt, d=2)
     { width: 52 },   // Comentari IA
     { width: 10 },   // Estat
   ];
@@ -148,7 +150,7 @@ function _maybeAddOmrLogSheet(wb) {
     hour: '2-digit', minute: '2-digit',
   });
 
-  ws.mergeCells('A1:E1');
+  ws.mergeCells('A1:G1');
   const titleCell = ws.getCell('A1');
   titleCell.value     = 'Log de reconeixement automàtic OMR';
   titleCell.font      = { bold: true, size: 11, color: { argb: 'FF1A4F8A' } };
@@ -156,7 +158,7 @@ function _maybeAddOmrLogSheet(wb) {
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getRow(1).height = 20;
 
-  ws.mergeCells('A2:E2');
+  ws.mergeCells('A2:G2');
   const metaCell = ws.getCell('A2');
   metaCell.value     = `Model: ${aiLog.model}   ·   Data: ${dateStr}   ·   ${aiLog.entries.length} full(s) processats`;
   metaCell.font      = { italic: true, size: 9, color: { argb: 'FF555555' } };
@@ -166,7 +168,7 @@ function _maybeAddOmrLogSheet(wb) {
 
   // ── Fila de capçaleres de columna ──
   const HDR_ARGB = 'FF1A4F8A';
-  const hdrRow = ws.addRow(['Pàgina', 'Nom detectat', 'Respostes vàl.', 'Comentari de la IA', 'Estat']);
+  const hdrRow = ws.addRow(['Pàgina', 'Nom detectat', 'Respostes vàl.', '⚑ Polèm.', '⚑ Dubt.', 'Comentari de la IA', 'Estat']);
   hdrRow.height = 15;
   hdrRow.eachCell(cell => {
     cell.font      = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
@@ -174,17 +176,21 @@ function _maybeAddOmrLogSheet(wb) {
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
   });
   hdrRow.getCell(2).alignment = { horizontal: 'left' };
-  hdrRow.getCell(4).alignment = { horizontal: 'left' };
+  hdrRow.getCell(6).alignment = { horizontal: 'left' };
 
   // ── Files de dades ──
   const WHITE = 'FFFFFFFF', GREY = 'FFF4F4F4';
   aiLog.entries.forEach((e, i) => {
     const bg      = i % 2 === 0 ? WHITE : GREY;
     const estat   = e.failed ? '⚠ Error' : (e.valid === e.total ? '✓ OK' : `✓ ${e.valid}/${e.total}`);
+    const tricky  = e.tricky | 0;
+    const doubt   = e.doubt  | 0;
     const row     = ws.addRow([
       e.page,
       e.failed ? '(error d\'API)' : (e.name || '(sense nom)'),
       e.failed ? '—' : `${e.valid} / ${e.total}`,
+      e.failed ? '—' : (tricky || ''),
+      e.failed ? '—' : (doubt  || ''),
       e.failed ? e.error : (e.comment || ''),
       estat,
     ]);
@@ -192,11 +198,22 @@ function _maybeAddOmrLogSheet(wb) {
     row.eachCell({ includeEmpty: true }, (cell, colNum) => {
       cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
       cell.font      = { size: 9 };
-      cell.alignment = { horizontal: colNum === 1 || colNum === 3 || colNum === 5
+      cell.alignment = { horizontal: (colNum === 1 || colNum === 3 || colNum === 4 || colNum === 5 || colNum === 7)
         ? 'center' : 'left', vertical: 'middle' };
     });
+    // Color suau a les columnes de flags si hi ha valor
+    if (!e.failed) {
+      if (tricky > 0) {
+        row.getCell(4).font = { size: 9, bold: true, color: { argb: 'FF8A6A00' } };
+        row.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF7D6' } };
+      }
+      if (doubt > 0) {
+        row.getCell(5).font = { size: 9, bold: true, color: { argb: 'FFB02020' } };
+        row.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE6E6' } };
+      }
+    }
     // Color de la columna Estat
-    const estatCell = row.getCell(5);
+    const estatCell = row.getCell(7);
     if (e.failed) {
       estatCell.font = { bold: true, size: 9, color: { argb: 'FFCC4444' } };
     } else {
@@ -339,6 +356,11 @@ export async function importRespostes(input) {
     setStuMap(newStuMap);
     setStuNames(newStuNames);
     setStuOrder(newStuOrder);
+    // Reset de flags: les dades importades d'un XLSX no porten cap incertesa
+    // de la IA (ja són dades validades per humans en alguna sessió anterior).
+    const newStuFlags = {};
+    newStuOrder.forEach(k => { newStuFlags[k] = Array(Q).fill(null); });
+    setStuFlags(newStuFlags);
     setCurIdx(0);
     let qIdx = newStuMap[newStuOrder[0]].findIndex(v => v === null);
     if (qIdx === -1) qIdx = Q;

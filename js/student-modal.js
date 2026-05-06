@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import {
-  getStuMap, getStuNames, getStuOrder, setStuOrder,
+  getStuMap, getStuFlags, getStuNames, getStuOrder, setStuOrder,
   getCurIdx, setCurIdx, setQIdx,
   isStuCompletePrompt, setStuCompletePrompt,
   markUnsaved, markSaved,
@@ -85,6 +85,7 @@ export function confirmStudent() {
   const Q = getQ();
   const stuOrder = getStuOrder();
   const stuMap   = getStuMap();
+  const stuFlags = getStuFlags();
   const stuNames = getStuNames();
   const nextN = stuOrder.length + 1;
   const rawName = document.getElementById('d-name').value.trim();
@@ -92,6 +93,7 @@ export function confirmStudent() {
   const key  = String(nextN);
 
   stuMap[key]   = Array(Q).fill(null);
+  stuFlags[key] = Array(Q).fill(null);   // alumne creat manualment: cap flag
   stuNames[key] = name;
   stuOrder.push(key);
   setCurIdx(stuOrder.length - 1);
@@ -108,10 +110,12 @@ export function clearAllData() {
     'Tots els alumnes i les seves respostes seran eliminats.\n\n' +
     'La clau de respostes correctes i la configuració del centre es mantindran.'
   )) return;
-  const stuMap = getStuMap();
+  const stuMap   = getStuMap();
+  const stuFlags = getStuFlags();
   const stuNames = getStuNames();
   const stuOrder = getStuOrder();
   Object.keys(stuMap).forEach(k => delete stuMap[k]);
+  Object.keys(stuFlags).forEach(k => delete stuFlags[k]);
   Object.keys(stuNames).forEach(k => delete stuNames[k]);
   stuOrder.length = 0;
   setCurIdx(-1);

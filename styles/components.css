@@ -80,9 +80,57 @@
   cursor: pointer; flex: 1; min-height: 0;
   transition: background .1s, border-color .1s;
   border-left-width: 3px;
+  position: relative;          /* ancoratge per al triangle del flag OMR */
+  overflow: hidden;            /* el triangle no sobresurt del border-radius */
 }
 .cell.filled { background: var(--f-bg); border-color: var(--f-brd); }
 .cell.active { background: var(--act-bg) !important; border-color: var(--act-bg) !important; }
+
+/* ── Flag d'incertesa de la IA (camp "d") ── */
+/* Aplicat per render.js via cell.dataset.flag = '1' (tricky) o '2' (doubt). */
+/* Fons subtilment tintat + triangle a la cantonada superior dreta.          */
+/* El triangle queda visible fins i tot quan la cel·la està .filled o .active*/
+/* (la regla "filled" no sobreescriu el background per la cascada — vegeu    */
+/* més avall: les regles "[data-flag]" venen DESPRÉS de .filled). En canvi   */
+/* .active sí que té !important per dominar quan l'usuari hi és sobre.       */
+.cell[data-flag="1"] { background: #fff7d6; border-color: #e6c34a; }
+.cell[data-flag="2"] { background: #fde6e6; border-color: #d97070; }
+.cell[data-flag="1"].filled { background: #fff1bf; }
+.cell[data-flag="2"].filled { background: #fbd6d6; }
+.cell[data-flag="1"]::after,
+.cell[data-flag="2"]::after {
+  content: '';
+  position: absolute; top: 0; right: 0;
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 0 9px 9px 0;
+  border-color: transparent #c89000 transparent transparent;
+  pointer-events: none;
+}
+.cell[data-flag="2"]::after { border-color: transparent #c93030 transparent transparent; }
+/* Damunt la cel·la activa el triangle es manté ben visible amb un to més clar. */
+.cell[data-flag="1"].active::after { border-color: transparent #ffd96b transparent transparent; }
+.cell[data-flag="2"].active::after { border-color: transparent #ff8a8a transparent transparent; }
+
+/* ── Header badge "N a revisar" (saltar a següent flag amb Tab) ── */
+.flag-badge {
+  font-family: inherit; font-size: .58rem; font-weight: 700;
+  padding: 3px 9px; border-radius: 10px;
+  background: #fff7d6; border: 1px solid #e6c34a; color: #6b4f00;
+  white-space: nowrap; flex-shrink: 0; cursor: pointer; letter-spacing: .03em;
+  display: flex; align-items: center; gap: 4px;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.flag-badge:hover { background: #ffeea8; border-color: #c89000; color: #4a3700; }
+.flag-badge[data-level="2"] {
+  background: #fde6e6; border-color: #d97070; color: #6f1d1d;
+}
+.flag-badge[data-level="2"]:hover { background: #fbd1d1; border-color: #c93030; color: #4a0e0e; }
+.flag-badge .flag-shortcut {
+  font-size: .52rem; opacity: .65; margin-left: 2px;
+  border: 1px solid currentColor; border-radius: 3px; padding: 0 4px;
+}
+
 .q-n { font-size: .6rem; color: var(--muted); width: 14px; text-align: right; flex-shrink: 0; }
 .cell.active .q-n { color: var(--act-txt); opacity: .6; }
 .q-a { font-size: .78rem; font-weight: 700; width: 13px; text-align: center; flex-shrink: 0; }

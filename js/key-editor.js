@@ -6,7 +6,7 @@
 import { COMPETENCIES } from '../data/competencies.js';
 import {
   getCurrentCompetencyId,
-  getStuMap, getStuNames, getStuOrder,
+  getStuMap, getStuFlags, getStuNames, getStuOrder,
   setCurIdx, setQIdx,
   getAnswerKey, setAnswerKey,
   markSaved,
@@ -214,8 +214,10 @@ export function loadKeyTxt(input) {
         )) return;
         if (stuOrder.length > 0) {
           const stuMap   = getStuMap();
+          const stuFlags = getStuFlags();
           const stuNames = getStuNames();
           Object.keys(stuMap).forEach(k => delete stuMap[k]);
+          Object.keys(stuFlags).forEach(k => delete stuFlags[k]);
           Object.keys(stuNames).forEach(k => delete stuNames[k]);
           stuOrder.length = 0;
           setCurIdx(-1);

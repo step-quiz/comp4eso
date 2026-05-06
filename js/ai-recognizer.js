@@ -22,7 +22,7 @@ import { CIEN_ITEMS, CIEN_RANGES } from '../data/ct-2025-26.js';
 
 import {
   getStuOrder,
-  setStuMap, setStuNames, setStuOrder,
+  setStuMap, setStuFlags, setStuNames, setStuOrder,
   setCurIdx, setQIdx,
   markSaved,
   getCurrentCompetencyId,
@@ -245,6 +245,7 @@ export async function processAiPdf(input) {
 
         if (result._failed) {
           logEntries.push({ page: p, name: '', valid: 0, total: Q,
+            tricky: 0, doubt: 0,
             comment: '', failed: true, error: result._error || 'Error desconegut' });
           _appendLog(
             `Pàg. ${p} — <strong>ERROR D'API</strong> — ${_esc(result._error)}`,
@@ -253,17 +254,26 @@ export async function processAiPdf(input) {
         } else {
           const valides = Object.values(result.respostes)
             .filter(v => v && v !== '?' && v !== '').length;
+          const flagsArr = Object.values(result.flags || {});
+          const tricky = flagsArr.filter(f => f === 1).length;
+          const doubt  = flagsArr.filter(f => f === 2).length;
           logEntries.push({ page: p, name: result.id_alumne || '', valid: valides, total: Q,
+            tricky, doubt,
             comment: result.comentari || '', failed: false, error: '' });
+          const flagSuffix = (tricky || doubt)
+            ? ` — <span style="color:#b8860b">⚑ ${tricky}</span>` +
+              (doubt ? ` <span style="color:#cc3333">⚑ ${doubt}</span>` : '')
+            : '';
           _appendLog(
             `Pàg. ${p} — <strong>${_esc(result.id_alumne || '(sense nom)')}</strong>` +
-            ` — ${valides}/${Q} respostes` +
+            ` — ${valides}/${Q} respostes` + flagSuffix +
             (result.comentari ? ` — <em>${_esc(result.comentari.slice(0, 80))}</em>` : ''),
             'ok'
           );
         }
       } catch (err) {
         logEntries.push({ page: p, name: '', valid: 0, total: Q,
+          tricky: 0, doubt: 0,
           comment: '', failed: true, error: err.message });
         _appendLog(`Pàg. ${p} — Error: ${_esc(err.message)}`, 'err');
         console.error(`Page ${p}:`, err);
@@ -392,10 +402,16 @@ async function _processPage(pdfDoc, pageNum, apiKey, competency, items, model, s
   // Tots els intents han fallat. Marquem el resultat amb un flag d'error
   // perquè la UI pugui mostrar un toast clar.
   const respostes = {};
-  items.forEach((_, i) => { respostes[`Q${String(i + 1).padStart(2, '0')}`] = '?'; });
+  const flags     = {};
+  items.forEach((_, i) => {
+    const qid = `Q${String(i + 1).padStart(2, '0')}`;
+    respostes[qid] = '?';
+    flags[qid]     = 2;   // tot dubtós: l'humà ho ha de revisar tot
+  });
   return {
     id_alumne: '',
     respostes,
+    flags,
     comentari: `ERROR: ${lastErr?.message}`,
     _failed: true,    // ← flag per a la UI
     _error: lastErr?.message || 'Error desconegut',
@@ -572,21 +588,48 @@ async function _callGemini(apiKey, model, base64, prompt, maxOutputTokens = 8000
 }
 
 // ─── Validació de la resposta de Claude ──────────────────────────────
+//
+// El nou format de la IA és { "v": <valor>, "d": 0|1|2 } per cada Q.
+// Tolerem el format antic (string pla) per robustesa: si la IA torna
+// directament una lletra/símbol, l'envoltem amb {v, d:0}.
 
 function _validarResposta(data, items) {
   const raw = (data.respostes && typeof data.respostes === 'object') ? data.respostes : {};
   const respostes = {};
+  const flags     = {};
   items.forEach((_, i) => {
     const qid = `Q${String(i + 1).padStart(2, '0')}`;
-    const rawVal = raw[qid];
-    let v = String(rawVal ?? '?').trim();
+    const rawEntry = raw[qid];
+
+    // Extreure v i d, acceptant ambdós formats
+    let vRaw, dRaw;
+    if (rawEntry && typeof rawEntry === 'object' && !Array.isArray(rawEntry)) {
+      vRaw = rawEntry.v;
+      dRaw = rawEntry.d;
+    } else {
+      // Format antic o resposta inesperada: string pla / null
+      vRaw = rawEntry;
+      dRaw = 0;
+    }
+
+    // Normalitzar v
+    let v = String(vRaw ?? '?').trim();
     if (v === '') v = '?';
     respostes[qid] = v;
+
+    // Normalitzar d a {0, 1, 2}. Si v === '?', forcem d = 2 (regla del prompt,
+    // però si la IA s'ho ha saltat, la validem nosaltres aquí).
+    let d = Number(dRaw);
+    if (!Number.isFinite(d) || d < 0) d = 0;
+    if (d > 2) d = 2;
+    if (v === '?') d = 2;
+    flags[qid] = d | 0;   // 0, 1 o 2 (enter)
   });
 
   return {
     id_alumne: String(data.id_alumne ?? '').trim(),
     respostes,
+    flags,
     comentari: String(data.comentari ?? '').trim(),
   };
 }
@@ -654,6 +697,7 @@ function _loadResultsIntoApp(results, competency, items, model, logEntries) {
   }
 
   const newStuMap   = {};
+  const newStuFlags = {};
   const newStuNames = {};
   const newStuOrder = [];
 
@@ -661,13 +705,27 @@ function _loadResultsIntoApp(results, competency, items, model, logEntries) {
     const idx = String(i + 1);
     newStuOrder.push(idx);
     newStuNames[idx] = result.id_alumne || `Alumne ${i + 1}`;
-    newStuMap[idx] = items.map((item, qi) => {
+    newStuMap[idx]   = items.map((item, qi) => {
       const qid = `Q${String(qi + 1).padStart(2, '0')}`;
       return normalitzarResposta(result.respostes[qid], item);
+    });
+    // Flags per la mateixa posició. Si la cel·la ja és null (la IA havia
+    // tornat «?» i serà revisada igualment), no hi posem flag perquè el
+    // caràcter «·» del centre ja crida prou l'atenció. Per a "tricky" i
+    // "doubt" amb resposta concreta o "—", sí que hi posem la flag.
+    newStuFlags[idx] = items.map((_, qi) => {
+      const qid    = `Q${String(qi + 1).padStart(2, '0')}`;
+      const ansVal = newStuMap[idx][qi];
+      const dRaw   = (result.flags && result.flags[qid]) | 0;
+      if (ansVal === null) return null;     // cel·la buida → cap flag visual
+      if (dRaw === 1) return 1;
+      if (dRaw === 2) return 2;
+      return null;
     });
   });
 
   setStuMap(newStuMap);
+  setStuFlags(newStuFlags);
   setStuNames(newStuNames);
   setStuOrder(newStuOrder);
   setCurIdx(0);
@@ -683,12 +741,20 @@ function _loadResultsIntoApp(results, competency, items, model, logEntries) {
 
   closeAiRecognizer();
 
-  // Comptem fulls fallats (tots els reintents han esgotat-se per error d'API)
-  // i respostes pendents (cel·les '?' = dubtes que la IA no ha sabut decidir)
+  // Comptem fulls fallats (tots els reintents han esgotat-se per error d'API),
+  // respostes pendents (cel·les '?' = la IA s'ha rendit) i ítems flagejats
+  // (la IA s'ha decidit, però convé revisar manualment: tricky o doubt).
   const failedPages = results.filter(r => r._failed);
   const dubtoses = results.reduce(
     (s, r) => s + Object.values(r.respostes).filter(v => v === '?').length, 0
   );
+  let trickyCount = 0, doubtCount = 0;
+  Object.values(newStuFlags).forEach(arr => {
+    arr.forEach(f => {
+      if (f === 1) trickyCount++;
+      else if (f === 2) doubtCount++;
+    });
+  });
 
   let msg = '';
   let urgent = false;
@@ -707,6 +773,12 @@ function _loadResultsIntoApp(results, competency, items, model, logEntries) {
     msg = `✓ ${results.length} alumne${results.length !== 1 ? 's' : ''} carregats via reconeixement automàtic.`;
     if (dubtoses > 0) {
       msg += ` ⚠️ ${dubtoses} resposta${dubtoses !== 1 ? 's' : ''} pendents de revisió manual (·).`;
+    }
+    if (trickyCount > 0 || doubtCount > 0) {
+      const parts = [];
+      if (doubtCount  > 0) parts.push(`${doubtCount} dubt${doubtCount !== 1 ? 'es' : 'e'}`);
+      if (trickyCount > 0) parts.push(`${trickyCount} polèmiq${trickyCount !== 1 ? 'ues' : 'ua'}`);
+      msg += ` 🔍 ${parts.join(' i ')} a revisar (cel·les ressaltades).`;
     }
   }
 
@@ -746,7 +818,7 @@ export function buildOmrPrompt(competencyId) {
       const bl = it.binLabels || ['A', 'B'];
       valor = `"${bl[0]}" | "${bl[1]}" | "—" | "?" | "!"`;
     } else valor = '"—" | "?" | "!"';
-    return `    "${qid}": ${valor},   // pregunta ${it.label}`;
+    return `    "${qid}": { "v": ${valor}, "d": 0 | 1 | 2 },   // pregunta ${it.label}`;
   }).join('\n');
 
   const qPad = String(Q).padStart(2, '0');
@@ -834,11 +906,45 @@ anul·lar-ne una) → retorna «!».
      · MAI inventis una resposta a una fila que percebis com a buida. Si no veus cap marca, \
        el valor és «—», no una lletra a l'atzar.
 
-9. FORMAT DE SORTIDA per cada tipus:
+9. FORMAT DE SORTIDA per cada tipus (camp "v"):
    - abcd: minúscula 'a', 'b', 'c' o 'd' (o «—», «?», «!»).
    - abcde: minúscula 'a', 'b', 'c', 'd' o 'e' (o «—», «?», «!»).
    - V/F: majúscula 'V' o 'F' (o «—», «?», «!»).
    - Binari: l'etiqueta humana sencera tal com apareix al full (o «—», «?», «!»).
+
+10. FLAG DE DIFICULTAT (camp "d", molt important): per cada ítem has d'avaluar \
+quanta dificultat t'ha costat decidir el valor i retornar un dels tres nivells:
+
+   - "d": 0 → FÀCIL. Cas net: una sola X clara dins d'un quadret buit, o tota la fila \
+buida (cap traç). No has dubtat ni un instant. Aquest és el cas habitual per a alumnes \
+que omplen el full amb cura.
+
+   - "d": 1 → COMPLICAT PERÒ RESOLT. La fila tenia complicacions que has hagut \
+d'interpretar aplicant les regles, però el resultat final és inequívoc i no dubtes. \
+Posa "d": 1, per exemple, en aquests casos:
+     · Hi ha un o més quadrets PLE (anul·lacions) i una X neta a una altra opció.
+     · Hi ha un quadrat PLE-ENCERCLAT (reanul·lació) i la resta neta o amb anul·lacions.
+     · Hi ha gargots o ratllades dins d'un quadret que has interpretat com a marca vàlida \
+       o com a esborrat amb confiança.
+     · Hi ha rastres d'esborrat clars que has descartat sense cap dubte.
+     · Hi ha múltiples marques i has acabat retornant «!» amb seguretat.
+   En tots aquests casos retornes la "v" amb confiança plena, però la fila és \
+"polèmica" i convé que un humà la repassi visualment.
+
+   - "d": 2 → DUBTE REAL. No estàs segur del que has retornat:
+     · Marca tènue, mig esborrada, ambigua, sense forma reconeixible.
+     · Cercle que no saps si envolta un quadrat ple o no.
+     · Dues marques on no pots distingir si una és esborrat o intencionada.
+     · Has retornat «?» perquè no t'has pogut decidir.
+     · Has retornat una lletra però amb baixa confiança ("la més probable, però..").
+     · Has retornat «—» però veus algun rastre que podria ser una marca dèbil.
+   Aquests ítems necessiten OBLIGATÒRIAMENT revisió humana.
+
+   REGLA D'OR: prefereix sempre "d": 2 a "d": 1 si tens el més mínim dubte sobre \
+   la "v". Una flag de més no fa mal (l'humà revisa 5 segons); una flag de menys \
+   amaga un error real.
+
+   Si retornes "v": "?", llavors "d" SEMPRE ha de ser 2.
 
 Si veus a la part superior del full una etiqueta identificativa (codi, DNI, número o text \
 manuscrit identificador), transcriu-la al camp "id_alumne". Si no es veu o és il·legible, \
@@ -854,7 +960,8 @@ ${jsonKeys}
 }
 
 Retorna NOMÉS aquest JSON, sense \`\`\`json ni cap altre text.
-Cada clau Q01..Q${qPad} ha de tenir un valor del seu tipus o «—», «?» o «!».`;
+Cada clau Q01..Q${qPad} ha de tenir un objecte amb "v" (valor del seu tipus o «—», «?», «!») \
+i "d" (0, 1 o 2 segons les regles del punt 10).`;
 }
 
 // ─── Helpers UI ───────────────────────────────────────────────────────

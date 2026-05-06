@@ -9,7 +9,7 @@
 import { COMPETENCIES } from '../data/competencies.js';
 import {
   getCurrentCompetencyId, getAmbits, getCurIdx, getQIdx,
-  getStuOrder, getStuNames, getStuMap,
+  getStuOrder, getStuNames, getStuMap, getStuFlags,
 } from './state.js';
 
 // ── Items / ranges via registry ──
@@ -76,12 +76,14 @@ export function render() {
   const stuOrder = getStuOrder();
   const stuNames = getStuNames();
   const stuMap   = getStuMap();
+  const stuFlags = getStuFlags();
   const curIdx   = getCurIdx();
   const qIdx     = getQIdx();
 
   const key  = curIdx >= 0 ? stuOrder[curIdx] : null;
   const name = key ? stuNames[key] : null;
   const answers = key ? stuMap[key] : null;
+  const flags   = key ? (stuFlags[key] || null) : null;
 
   const isEmpty = stuOrder.length === 0;
   document.getElementById('btn-prev-stu').style.display  = isEmpty ? 'none' : '';
@@ -95,9 +97,13 @@ export function render() {
     const cell  = document.getElementById(`c${qi}`);
     const ansEl = document.getElementById(`a${qi}`);
     if (!cell || !ansEl) continue;
-    const val = answers ? answers[qi] : null;
+    const val  = answers ? answers[qi] : null;
+    const flag = flags   ? flags[qi]   : null;
     cell.className = 'cell';
     cell.dataset.v = '';
+    // Flag d'incertesa de la IA: '' = sense flag, '1' = tricky, '2' = doubt.
+    // El CSS s'encarrega de pintar el fons subtil i el triangle a la cantonada.
+    cell.dataset.flag = flag ? String(flag) : '';
     ansEl.className = 'q-a';
 
     const a = getAmbitForQ(qi);
@@ -128,4 +134,49 @@ export function render() {
   document.getElementById('done-b').style.display = filled === Q ? 'inline-block' : 'none';
   document.getElementById('prog').style.width =
     answers ? `${(filled / Q) * 100}%` : '0%';
+
+  // Indicador agregat al header amb el comptador d'ítems flagejats
+  // de l'alumne actual. Es mostra només si n'hi ha algun.
+  _renderFlagBadge(flags);
+}
+
+// Compta i pinta el badge "⚠ N a revisar" del header.
+// El botó tindrà handler a init.js (jumpToNextFlag).
+function _renderFlagBadge(flags) {
+  const badge = document.getElementById('btn-next-flag');
+  if (!badge) return;
+  if (!flags) {
+    badge.style.display = 'none';
+    return;
+  }
+  let tricky = 0, doubt = 0;
+  for (const f of flags) {
+    if (f === 1) tricky++;
+    else if (f === 2) doubt++;
+  }
+  const total = tricky + doubt;
+  if (total === 0) {
+    badge.style.display = 'none';
+    return;
+  }
+  badge.style.display = '';
+  // Si hi ha algun "doubt" (rojo), el badge agafa el ressalt vermell;
+  // si només hi ha "tricky", el groc.
+  badge.dataset.level = doubt > 0 ? '2' : '1';
+  const cnt = badge.querySelector('#flag-count');
+  if (cnt) cnt.textContent = String(total);
+}
+
+// Troba la pregunta flagejada més propera començant per `from` (excloent-la).
+// Direcció: +1 (següent) o -1 (anterior). Wrap-around si cal. Retorna -1 si
+// no n'hi ha cap.
+export function findNextFlaggedQ(from, direction) {
+  const flags = getStuFlags()[getStuOrder()[getCurIdx()]];
+  if (!flags) return -1;
+  const Q = flags.length;
+  for (let step = 1; step <= Q; step++) {
+    const idx = ((from + step * direction) % Q + Q) % Q;
+    if (flags[idx]) return idx;
+  }
+  return -1;
 }
