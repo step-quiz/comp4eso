@@ -963,6 +963,14 @@ crític per a tu i per a l'humà — flagejar generosament aquí salva errors:
      · Has retornat «—» però veus algun rastre que podria ser una marca dèbil.
    Aquests ítems necessiten OBLIGATÒRIAMENT revisió humana.
 
+   ⚠️ MOLT IMPORTANT — la flag d:2 NO té límit quantitatiu. Si un alumne té \
+   un full amb moltes marques tènues, esborrats no nets, o ambigüitats reals, \
+   és perfectament legítim i esperat que aquest full tingui 4, 5 o més flags \
+   d:2. NO t'autocensuris la flag d:2 per estètica ni per voler retornar pocs \
+   flags. Cada d:2 és una alerta màxima que pot evitar un error d'OMR. \
+   Els humans prefereixen 100 vegades revisar 5 flags d:2 sobre un alumne \
+   complicat que perdre's un error per no haver-lo flagejat.
+
    REGLA D'OR PER A "d": 2: prefereix sempre "d": 2 sobre la teva pròpia resposta \
    si tens el més mínim dubte real sobre la "v". Mai amaguis una incertesa sobre \
    el VALOR retornat. (Aquesta regla d'or NO s'aplica a "d": 1: per a "d": 1 has \
@@ -970,11 +978,16 @@ crític per a tu i per a l'humà — flagejar generosament aquí salva errors:
 
    Si retornes "v": "?", llavors "d" SEMPRE ha de ser 2.
 
-   CALIBRACIÓ ESPERADA: en un full típic (32 preguntes), espera retornar 0–2 flags \
-   d'algun tipus en total. Tres o més flags al mateix full ha de ser excepcional i \
-   reflectir un full realment complicat (esborrats, marques múltiples, alumne dubitatiu). \
-   Si et trobes posant 5+ flags al mateix full, atura't i revisa: probablement estiguis \
-   caient en algun dels tres anti-patrons.
+   CALIBRACIÓ ESPERADA per a la flag GROGA (d:1) NOMÉS: en un full típic \
+   (32 preguntes), espera retornar 0–2 flags GROGUES (d:1) en total. Si poses \
+   5+ flags grogues al mateix full, atura't i revisa: probablement estiguis \
+   caient en algun dels tres anti-patrons (a/b/c).
+
+   La flag VERMELLA (d:2) NO té cap calibració quantitativa. El nombre de \
+   flags d:2 d'un full reflecteix la qualitat real d'aquell full: un full \
+   net pot tenir 0 d:2; un full amb un alumne dubitatiu pot tenir-ne 6+. \
+   Tots dos casos són correctes. La regla és simple: si dubtes sobre la \
+   resposta retornada, posa d:2 — sempre.
 
 Si veus a la part superior del full una etiqueta identificativa (codi, DNI, número o text \
 manuscrit identificador), transcriu-la al camp "id_alumne". Si no es veu o és il·legible, \
