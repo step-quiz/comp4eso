@@ -8,7 +8,7 @@
 import { COMPETENCIES } from '../data/competencies.js';
 import {
   getCurrentCompetencyId,
-  getStuMap, setStuMap, setStuFlags, getStuNames, setStuNames, getStuOrder, setStuOrder,
+  getStuMap, setStuMap, getStuFlags, setStuFlags, getStuNames, setStuNames, getStuOrder, setStuOrder,
   getCentreCfg, setCentreCfg,
   setCurIdx, setQIdx,
   getAnswerKey, setAnswerKey,
@@ -113,6 +113,7 @@ export async function exportRespostes() {
 
   const buf  = await wb.xlsx.writeBuffer();
   _maybeAddOmrLogSheet(wb);
+  _maybeAddFlagsSheet(wb);
   const buf2 = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf2], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url  = URL.createObjectURL(blob);
@@ -218,6 +219,81 @@ function _maybeAddOmrLogSheet(wb) {
       estatCell.font = { bold: true, size: 9, color: { argb: 'FFCC4444' } };
     } else {
       estatCell.font = { size: 9, color: { argb: 'FF27AE60' } };
+    }
+  });
+}
+
+// ─── Full tècnic "_flags" ─────────────────────────────────────────────
+//
+// Persisteix les flags d'incertesa de la IA per cel·la (0/1/2) en una matriu
+// alumne × pregunta. Es crea només si hi ha flags actives a `_stuFlags` (i.e.,
+// l'usuari ha fet un reconeixement automàtic en aquesta sessió i encara no ha
+// editat totes les cel·les flagejades). El nom comença amb "_" per indicar
+// que és un full tècnic, paral·lel a "_meta": el podràs veure si l'obres,
+// però no entorpeix la lectura humana del workbook.
+//
+// Format: primera fila = capçalera ("Alumne", "Q01", "Q02", ..., "Q32").
+// Cada fila següent = un alumne, en el mateix ordre que a "Respostes".
+// Cel·les: 0 (cap flag), 1 (tricky), 2 (doubt). Buit també vol dir 0 (cap flag).
+//
+// La importació, a la inversa, llegeix aquest full si existeix i repobla
+// _stuFlags. Si no existeix, _stuFlags queda buit (comportament de fitxers
+// importats que provenen d'una sessió sense reconeixement automàtic).
+
+function _maybeAddFlagsSheet(wb) {
+  const stuFlags = getStuFlags();
+  const stuOrder = getStuOrder();
+  if (!stuOrder.length) return;
+
+  // Comptem si hi ha alguna flag activa. Si tot és null/0, no escrivim el full.
+  let any = false;
+  for (const k of stuOrder) {
+    const arr = stuFlags[k];
+    if (!arr) continue;
+    if (arr.some(v => v === 1 || v === 2)) { any = true; break; }
+  }
+  if (!any) return;
+
+  // Mida del full = longitud de l'array de flags del primer alumne (= Q).
+  // Tots els alumnes tenen la mateixa Q per construcció (vegeu state.js).
+  const Q = (stuFlags[stuOrder[0]] || []).length;
+  if (!Q) return;
+
+  const ws = wb.addWorksheet('_flags');
+  ws.getColumn(1).width = 6;
+  for (let q = 1; q <= Q; q++) ws.getColumn(q + 1).width = 5;
+
+  // Capçalera
+  const hdr = ['Alumne'];
+  for (let q = 1; q <= Q; q++) hdr.push('Q' + String(q).padStart(2, '0'));
+  const hdrRow = ws.addRow(hdr);
+  hdrRow.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+  hdrRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A4F8A' } };
+  hdrRow.alignment = { horizontal: 'center', vertical: 'middle' };
+  hdrRow.height = 14;
+
+  // Files de dades
+  stuOrder.forEach((k, i) => {
+    const arr = stuFlags[k] || [];
+    const row = [k];
+    for (let q = 0; q < Q; q++) {
+      const v = arr[q];
+      row.push(v === 1 || v === 2 ? v : 0);
+    }
+    const r = ws.addRow(row);
+    r.font = { size: 9 };
+    r.alignment = { horizontal: 'center', vertical: 'middle' };
+    r.height = 13;
+    // Tint suau a les cel·les amb flag perquè es vegi a ull si obres el full
+    for (let q = 0; q < Q; q++) {
+      const v = arr[q];
+      if (v === 1) {
+        r.getCell(q + 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF7D6' } };
+        r.getCell(q + 2).font = { size: 9, bold: true, color: { argb: 'FF8A6A00' } };
+      } else if (v === 2) {
+        r.getCell(q + 2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE6E6' } };
+        r.getCell(q + 2).font = { size: 9, bold: true, color: { argb: 'FFB02020' } };
+      }
     }
   });
 }
@@ -356,10 +432,33 @@ export async function importRespostes(input) {
     setStuMap(newStuMap);
     setStuNames(newStuNames);
     setStuOrder(newStuOrder);
-    // Reset de flags: les dades importades d'un XLSX no porten cap incertesa
-    // de la IA (ja són dades validades per humans en alguna sessió anterior).
+
+    // Llegir el full "_flags" si existeix al workbook. Si hi és, s'estan
+    // re-important les flags de la IA d'una sessió anterior — útil per a
+    // continuar la revisió on s'havia deixat. Si no hi és (cas habitual:
+    // dades ja validades per humans), inicialitzem tot a null.
     const newStuFlags = {};
     newStuOrder.forEach(k => { newStuFlags[k] = Array(Q).fill(null); });
+
+    const wsFlags = wb2.getWorksheet('_flags');
+    if (wsFlags) {
+      // Capçalera a la fila 1: ['Alumne', 'Q01', 'Q02', ...].
+      // Files 2..N: clau de l'alumne + valors 0/1/2 per pregunta.
+      // Mapeig per clau d'alumne (no per ordre de fila) per robustesa
+      // davant fitxers reordenats manualment.
+      wsFlags.eachRow({ includeEmpty: false }, (row, rowNum) => {
+        if (rowNum === 1) return;
+        const key = row.getCell(1).value;
+        const k   = key == null ? '' : String(key).trim();
+        if (!k || !newStuFlags[k]) return;   // alumne desconegut: ignorat
+        for (let q = 0; q < Q; q++) {
+          const raw = row.getCell(q + 2).value;
+          const v = Number(raw);
+          if (v === 1 || v === 2) newStuFlags[k][q] = v;
+        }
+      });
+    }
+
     setStuFlags(newStuFlags);
     setCurIdx(0);
     let qIdx = newStuMap[newStuOrder[0]].findIndex(v => v === null);

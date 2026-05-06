@@ -916,35 +916,65 @@ anul·lar-ne una) → retorna «!».
 quanta dificultat t'ha costat decidir el valor i retornar un dels tres nivells:
 
    - "d": 0 → FÀCIL. Cas net: una sola X clara dins d'un quadret buit, o tota la fila \
-buida (cap traç). No has dubtat ni un instant. Aquest és el cas habitual per a alumnes \
-que omplen el full amb cura.
+buida (cap traç). No has dubtat ni un instant. **Aquest ha de ser el cas MAJORITARI: \
+la majoria de files de la majoria d'alumnes són d:0.** Fins i tot quan has hagut de \
+fer una mica de raonament (descartar un rastre tènue, aplicar la regla d'anul·lació \
+sobre un patró clar), si el resultat és inequívoc i tu mateix l'admetries com a \
+correcte sense vacil·lar, és d:0.
 
-   - "d": 1 → COMPLICAT PERÒ RESOLT. La fila tenia complicacions que has hagut \
-d'interpretar aplicant les regles, però el resultat final és inequívoc i no dubtes. \
-Posa "d": 1, per exemple, en aquests casos:
-     · Hi ha un o més quadrets PLE (anul·lacions) i una X neta a una altra opció.
-     · Hi ha un quadrat PLE-ENCERCLAT (reanul·lació) i la resta neta o amb anul·lacions.
-     · Hi ha gargots o ratllades dins d'un quadret que has interpretat com a marca vàlida \
-       o com a esborrat amb confiança.
-     · Hi ha rastres d'esborrat clars que has descartat sense cap dubte.
-     · Hi ha múltiples marques i has acabat retornant «!» amb seguretat.
-   En tots aquests casos retornes la "v" amb confiança plena, però la fila és \
-"polèmica" i convé que un humà la repassi visualment.
+   - "d": 1 → COMPLICAT PERÒ RESOLT. Reservat per a un nombre PETIT de casos on \
+la fila té una ambigüitat estructural NO trivial que vols que un humà repassi, però \
+la teva lectura és ferma. Posa "d": 1 NOMÉS quan:
+     · Hi ha múltiples marques que has acabat retornant amb «!» amb seguretat.
+     · Hi ha una reanul·lació complexa (un quadrat PLE-ENCERCLAT amb altres marques al voltant).
+     · Hi ha un patró estrany que un altre revisor humà podria interpretar diferent que tu \
+       (i.e., la teva resposta és defensable però no és l'única defensable).
 
-   - "d": 2 → DUBTE REAL. No estàs segur del que has retornat:
+   ⚠️ NO posis "d": 1 en aquests tres casos (són els errors més freqüents de calibració):
+
+   (a) Estil de marca consistent ≠ polèmica.
+       Si l'alumne marca aspes, diagonals, gargots, traços poc convencionals, però \
+       fa servir el MATEIX estil al llarg de tot el full i la lectura de cada fila és \
+       inequívoca, retorna "d": 0 a totes les files. L'estil personal d'un alumne no \
+       és una polèmica; és el seu estil. Només si una marca concreta destaca de la \
+       resta del full (i.e., una fila té una marca diferent de les altres del mateix \
+       alumne i no saps com interpretar-la) considera "d": 1.
+
+   (b) Anul·lació o esborrat ben resolts ≠ polèmica.
+       Si has aplicat una regla d'anul·lació o de descartament d'esborrat (per exemple: \
+       "una opció PLE i una altra amb X neta → la X és la vàlida", o "un rastre molt \
+       més tènue que la marca principal → és esborrat") i el resultat és inequívoc, \
+       retorna "d": 0. La regla 10 és per quan dubtes de la pròpia resposta, no per \
+       quan has hagut de pensar dos segons per arribar-hi.
+
+   (c) Rastres tènues clarament descartables ≠ polèmica.
+       Un rastre que és visiblement més tènue, més petit o menys definit que les \
+       marques vàlides del mateix full és un esborrat amb confiança plena. Retorna \
+       "d": 0. "d": 1 només si el rastre té una intensitat o forma comparable a una \
+       marca vàlida i podria ser una marca real.
+
+   - "d": 2 → DUBTE REAL. No estàs segur del que has retornat. Aquest cas SÍ és \
+crític per a tu i per a l'humà — flagejar generosament aquí salva errors:
      · Marca tènue, mig esborrada, ambigua, sense forma reconeixible.
      · Cercle que no saps si envolta un quadrat ple o no.
-     · Dues marques on no pots distingir si una és esborrat o intencionada.
+     · Dues marques on no pots distingir quina és intencionada.
      · Has retornat «?» perquè no t'has pogut decidir.
-     · Has retornat una lletra però amb baixa confiança ("la més probable, però..").
+     · Has retornat una lletra però amb baixa confiança ("la més probable, però...").
      · Has retornat «—» però veus algun rastre que podria ser una marca dèbil.
    Aquests ítems necessiten OBLIGATÒRIAMENT revisió humana.
 
-   REGLA D'OR: prefereix sempre "d": 2 a "d": 1 si tens el més mínim dubte sobre \
-   la "v". Una flag de més no fa mal (l'humà revisa 5 segons); una flag de menys \
-   amaga un error real.
+   REGLA D'OR PER A "d": 2: prefereix sempre "d": 2 sobre la teva pròpia resposta \
+   si tens el més mínim dubte real sobre la "v". Mai amaguis una incertesa sobre \
+   el VALOR retornat. (Aquesta regla d'or NO s'aplica a "d": 1: per a "d": 1 has \
+   de ser conservador i seguir els tres anti-patrons d'amunt.)
 
    Si retornes "v": "?", llavors "d" SEMPRE ha de ser 2.
+
+   CALIBRACIÓ ESPERADA: en un full típic (32 preguntes), espera retornar 0–2 flags \
+   d'algun tipus en total. Tres o més flags al mateix full ha de ser excepcional i \
+   reflectir un full realment complicat (esborrats, marques múltiples, alumne dubitatiu). \
+   Si et trobes posant 5+ flags al mateix full, atura't i revisa: probablement estiguis \
+   caient en algun dels tres anti-patrons.
 
 Si veus a la part superior del full una etiqueta identificativa (codi, DNI, número o text \
 manuscrit identificador), transcriu-la al camp "id_alumne". Si no es veu o és il·legible, \
